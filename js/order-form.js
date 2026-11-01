@@ -30,6 +30,7 @@ function resetOrderForm() {
 
 function openOrderModal(orderId) {
   resetOrderForm();
+  if (typeof orderFormAcctSetup === "function") orderFormAcctSetup(orderId ? state.orders.find(function (x) { return x.id === orderId; }) : null);
   if (orderId) {
     var o = state.orders.find(function (x) { return x.id === orderId; });
     if (o) {
@@ -156,6 +157,7 @@ function handleOrderSubmit(e) {
     createdAt: editingId ? (state.orders.find(function (o) { return o.id === editingId; }) || {}).createdAt || Date.now() : Date.now()
   };
 
+  if (typeof finAccts === "function" && finAccts().length) order.acct = document.getElementById("fAcct").value;
   var paidInfo = null, prevOrder = null;
   if (editingId) {
     var idx = state.orders.findIndex(function (o) { return o.id === editingId; });
@@ -164,6 +166,7 @@ function handleOrderSubmit(e) {
       // keep fields the form does not edit (payment date, refund)
       if (prevOrder.paidFullDate) order.paidFullDate = prevOrder.paidFullDate;
       if (prevOrder.refund) order.refund = prevOrder.refund;
+      if (!order.acct && prevOrder.acct) order.acct = prevOrder.acct;
       if (prevOrder.status !== order.status) paidInfo = financeOnStatusChange(order, prevOrder.status);
     }
     if (idx !== -1) state.orders[idx] = order;

@@ -53,7 +53,7 @@ function openDetailModal(id) {
 
   var body =
     '<div class="detail-hero">' + hero + "</div>" +
-    '<span class="detail-status ' + style.bg + '">' + statusLabel(o.status) + "</span>" +
+    '<span class="detail-status" style="--c:var(--status-' + (STATUS_STYLE[o.status] ? o.status : "deposit") + ')">' + statusIconHtml(STATUS_STYLE[o.status] ? o.status : "deposit", "sm") + "<span>" + statusLabel(o.status) + "</span></span>" +
     '<div class="detail-title">' + nameHtml(o) + "</div>" +
     '<div class="detail-shop">🏬 ' + escapeHtml(o.shopName || t("noShop")) +
       (o.shopLink ? ' &nbsp;·&nbsp; <a href="' + escapeHtml(o.shopLink) + '" target="_blank" rel="noopener">' + t("openShopLink") + "</a>" : "") +

@@ -40,6 +40,8 @@ function renderHeaderText() {
     }
   }
   if (subtitleEl) subtitleEl.textContent = headerData.subtitle || t("appSubtitle");
+  var hd = document.getElementById("appHeader");
+  if (hd) { hd.classList.toggle("has-sub", !!headerData.subtitle); hd.classList.toggle("has-title", !!headerData.title); }
 }
 
 function renderHeaderBanner() {

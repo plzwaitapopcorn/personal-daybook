@@ -18,17 +18,18 @@ function saveViewPrefs() {
   try { localStorage.setItem(VIEW_KEY, JSON.stringify(viewPrefs)); } catch (e) { /* ignore */ }
 }
 var STATUS_GROUPS = [
-  { key: "pay",       statuses: ["deposit"],                          labelKey: "groupPay",       color: "var(--status-deposit)" },
-  { key: "wait",      statuses: ["full", "shipping", "intransit"],    labelKey: "groupWait",      color: "var(--status-shipping)" },
-  { key: "wishlist",  statuses: ["wishlist"],                         labelKey: "groupWishlist",  color: "var(--status-wishlist)" },
-  { key: "done",      statuses: ["received"],                         labelKey: "groupDone",      color: "var(--status-received)" },
-  { key: "cancelled", statuses: ["cancelled"],                        labelKey: "groupCancelled", color: "var(--status-cancelled)" }
+  { key: "pay",       statuses: ["deposit"],                          labelKey: "groupPay",       icon: "deposit" },
+  { key: "wait",      statuses: ["full", "shipping", "intransit"],    labelKey: "groupWait",      icon: "shipping" },
+  { key: "wishlist",  statuses: ["wishlist"],                         labelKey: "groupWishlist",  icon: "wishlist" },
+  { key: "done",      statuses: ["received"],                         labelKey: "groupDone",      icon: "received" },
+  { key: "cancelled", statuses: ["cancelled"],                        labelKey: "groupCancelled", icon: "cancelled" }
 ];
 
 var PRIMARY_KEY = "preorderVault_primary";
 // Primary colors: the six status-palette colors plus the original teal.
 // fill = button/fill color, ink = same hue readable as text on that mode's background, on = text drawn on the fill.
 var PRIMARIES = [
+  { id: "red",    nameKey: "colorRed",    dark: { c: "#e5604d", ink: "#ef7d6c", on: "#ffffff" }, light: { c: "#d64533", ink: "#c23a28", on: "#ffffff" } },
   { id: "teal",   nameKey: "colorTeal",   dark: { c: "#33d6c0", ink: "#33d6c0", on: "#111315" }, light: { c: "#0f9c8c", ink: "#0f9c8c", on: "#ffffff" } },
   { id: "pink",   nameKey: "colorPink",   dark: { c: "#ff4ace", ink: "#ff4ace", on: "#111315" }, light: { c: "#ff6dd8", ink: "#c2188f", on: "#111315" } },
   { id: "orange", nameKey: "colorOrange", dark: { c: "#ff953d", ink: "#ff953d", on: "#111315" }, light: { c: "#ffab66", ink: "#c2570c", on: "#111315" } },
@@ -57,3 +58,8 @@ var STATUS_KEY_MAP = {
   cancelled: "statusCancelled",
   wishlist: "statusWishlist"
 };
+
+// Status = a small coloured icon (shape tells the status, colour only supports it).
+function statusIconHtml(status, cls) {
+  return '<span class="si' + (cls ? " " + cls : "") + '" style="--c:var(--status-' + status + ')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-' + status + '"/></svg></span>';
+}

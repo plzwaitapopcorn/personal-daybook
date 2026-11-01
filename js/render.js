@@ -197,7 +197,7 @@ function renderGrid() {
       '<article class="card' + (o.status === "cancelled" ? " is-cancelled" : "") + (selected[o.id] ? " is-selected" : "") + '" data-id="' + o.id + '">' + '<span class="sel-box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span>' +
         '<div style="position:relative;">' + thumb + statusSelectHtml(o) +
         "</div>" +
-        '<div class="card-body ' + style.border + '">' +
+        '<div class="card-body">' +
           "<h3>" + nameHtml(o) + "</h3>" +
           '<div class="shop">🏬 ' + escapeHtml(o.shopName || t("noShop")) + "</div>" +
           '<div class="price-row">' +
@@ -217,7 +217,7 @@ function renderGrid() {
       ? '<img src="' + (o.mainThumb || o.mainImage).replace(/"/g, "&quot;") + '" alt="" loading="lazy">'
       : placeholderSvg();
     return (
-      '<article class="row ' + style.border + (o.status === "cancelled" ? " is-cancelled" : "") + (selected[o.id] ? " is-selected" : "") + '" data-id="' + o.id + '">' + '<span class="sel-box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span>' +
+      '<article class="row' + (o.status === "cancelled" ? " is-cancelled" : "") + (selected[o.id] ? " is-selected" : "") + '" data-id="' + o.id + '">' + '<span class="sel-box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span>' +
         '<div class="row-thumb">' + thumb + "</div>" +
         '<div class="row-main"><div class="row-title">' + nameHtml(o) + '</div>' +
           '<div class="row-shop">🏬 ' + escapeHtml(o.shopName || t("noShop")) + "</div></div>" +
@@ -254,7 +254,7 @@ function renderGrid() {
         return '<section class="group' + (collapsed ? " collapsed" : "") + '">' +
           '<button type="button" class="group-head" data-group="' + g.key + '" aria-expanded="' + (!collapsed) + '">' +
             '<svg class="chev-g" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l4 4 4-4"/></svg>' +
-            '<span class="g-dot" style="background:' + g.color + '"></span>' +
+            statusIconHtml(g.icon, "sm") +
             "<span>" + t(g.labelKey) + '</span><span class="g-count">' + items.length + "</span>" +
             (due > 0 ? '<span class="g-extra">' + t("dueLine", { remain: money(due) }) + "</span>" : "") +
           "</button>" +
@@ -291,12 +291,13 @@ function renderGrid() {
 }
 
 function statusSelectHtml(o) {
-  var style = STATUS_STYLE[o.status] || STATUS_STYLE.deposit;
+  var st = STATUS_STYLE[o.status] ? o.status : "deposit";
   var options = ["wishlist", "deposit", "full", "shipping", "intransit", "received", "cancelled"].map(function (key) {
     return '<option value="' + key + '"' + (o.status === key ? " selected" : "") + ">" + statusLabel(key) + "</option>";
   }).join("");
-  return '<select class="status-select ' + style.bg + '" data-id="' + o.id +
-    '" aria-label="' + t("changeStatusAria") + '" title="' + t("changeStatusTitle") + '">' + options + "</select>";
+  return '<span class="status-pick" style="--c:var(--status-' + st + ')" title="' + escapeHtml(statusLabel(st)) + '">' +
+    '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-' + st + '"/></svg>' +
+    '<select class="status-select" data-id="' + o.id + '" aria-label="' + t("changeStatusAria") + ": " + escapeHtml(statusLabel(st)) + '">' + options + "</select></span>";
 }
 
 function updateOrderStatus(id, newStatus) {

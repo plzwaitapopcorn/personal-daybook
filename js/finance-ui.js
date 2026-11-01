@@ -1,11 +1,12 @@
 "use strict";
 // ---------- Finance: pages, forms, home widgets ----------
-var finView = { month: monthKeyOf(new Date()), type: "all", cat: "" };
-var txDraft = { id: null, type: "expense", cat: "" };
+var finView = { month: monthKeyOf(new Date()), type: "all", cat: "", acct: "" };
+var txDraft = { id: null, type: "expense", cat: "", acct: "", to: "" };
 var catDraft = { id: null, type: "expense", color: CAT_COLORS[0] };
 
 function yen(n) { return "฿" + money(n); }
-function signedYen(r) { return (r.type === "income" ? "+" : "−") + yen(r.amount); }
+function signedYen(r) { return r.type === "transfer" ? yen(r.amount) : (r.type === "income" ? "+" : "−") + yen(r.amount); }
+function acctName(id) { var a = finAcctById(id); return a ? a.name : ""; }
 function el(id) { return document.getElementById(id); }
 function orderRef(id) { return state.orders.find(function (o) { return o.id === id; }) || null; }
 
@@ -106,22 +107,45 @@ function renderTxCats() {
     return '<button type="button" class="cat-chip' + (c.id === txDraft.cat ? " on" : "") + '" data-catpick="' + c.id + '"><i style="background:' + finCatColor(c) + '"></i>' + escapeHtml(finCatName(c)) + "</button>";
   }).join("");
 }
+function fillAcctSelect(sel, value, exceptId) {
+  sel.innerHTML = finAccts().map(function (a) {
+    return '<option value="' + a.id + '"' + (a.id === value ? " selected" : "") + ">" + escapeHtml(a.name) + "</option>";
+  }).join("");
+  if (value) sel.value = value;
+}
 function setTxType(type) {
   txDraft.type = type;
   Array.prototype.forEach.call(document.querySelectorAll("[data-txtype]"), function (b) {
     var on = b.getAttribute("data-txtype") === type;
     b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false");
   });
-  el("txModalTitle").textContent = t(type === "income" ? "finAddIncome" : "finAddExpense");
-  renderTxCats();
+  var tr = type === "transfer";
+  el("txModalTitle").textContent = t(type === "income" ? "finAddIncome" : tr ? "finAddTransfer" : "finAddExpense");
+  el("txCatRow").hidden = tr;
+  el("txToRow").hidden = !tr;
+  el("txAcctLabel").textContent = t(tr ? "finTransferFrom" : "finAccount");
+  if (!tr) renderTxCats();
 }
-function openTxModal(id, type) {
+// opts: { acct, to, amount, note } presets (used by "pay card")
+function openTxModal(id, type, opts) {
+  opts = opts || {};
   var x = id ? fin.items.find(function (i) { return i.id === id && i.kind === "tx"; }) : null;
+  var hasAcct = finAccts().length > 0, main = finMainAcct();
   txDraft.id = x ? x.id : null;
   txDraft.cat = x ? x.cat : "";
-  el("fTxAmount").value = x ? x.amount : "";
+  el("txSegTransfer").style.display = finAccts().length > 1 ? "" : "none";
+  el("txAcctRow").hidden = !hasAcct;
+  if (hasAcct) {
+    fillAcctSelect(el("fTxAcct"), x ? (x.acct || (main && main.id)) : (opts.acct || (main && main.id)));
+    fillAcctSelect(el("fTxTo"), x ? x.to : (opts.to || ""));
+    if (!x && !opts.to) { // default destination = first account that is not the source
+      var other = finAccts().filter(function (a) { return a.id !== el("fTxAcct").value; })[0];
+      if (other) el("fTxTo").value = other.id;
+    }
+  }
+  el("fTxAmount").value = x ? x.amount : (opts.amount != null ? opts.amount : "");
   el("fTxDate").value = x ? x.date : todayStr();
-  el("fTxNote").value = x ? (x.note || "") : "";
+  el("fTxNote").value = x ? (x.note || "") : (opts.note || "");
   el("btnTxDelete").style.display = x ? "inline-block" : "none";
   setTxType(x ? x.type : (type || "expense"));
   if (x) el("txModalTitle").textContent = t("finEditRecord");
@@ -133,8 +157,14 @@ function submitTx(e) {
   e.preventDefault();
   var amount = parseFloat(el("fTxAmount").value);
   if (!(amount > 0)) { el("fTxAmount").focus(); return; }
+  var tr = txDraft.type === "transfer", hasAcct = finAccts().length > 0;
   var rec = { id: txDraft.id || uid(), kind: "tx", type: txDraft.type, amount: amount, date: el("fTxDate").value || todayStr(),
-    cat: txDraft.cat, note: el("fTxNote").value.trim() };
+    cat: tr ? "" : txDraft.cat, note: el("fTxNote").value.trim() };
+  if (hasAcct) rec.acct = el("fTxAcct").value;
+  if (tr) {
+    rec.to = el("fTxTo").value;
+    if (!rec.to || rec.to === rec.acct) { alert(t("finTransferSame")); return; }
+  }
   var i = fin.items.findIndex(function (x) { return x.id === rec.id; });
   if (i >= 0) fin.items[i] = rec; else fin.items.push(rec);
   finView.month = rec.date.slice(0, 7);
@@ -199,24 +229,45 @@ function deleteCat() {
 // ================= pages =================
 function monthNavHtml() {
   var isNow = finView.month === monthKeyOf(new Date());
-  return '<div class="fin-monthnav"><button type="button" class="tool-btn" data-fm="-1" aria-label="' + escapeHtml(t("finPrevMonth")) + '">' + svgIcon("chev-l") + "</button>" +
-    "<b>" + escapeHtml(monthLabelOf(finView.month)) + '</b><button type="button" class="tool-btn" data-fm="1" aria-label="' + escapeHtml(t("finNextMonth")) + '">' + svgIcon("chev-r") + "</button>" +
-    (isNow ? "" : '<button type="button" class="btn-ghost-sm" data-fm="now">' + escapeHtml(t("finThisMonth")) + "</button>") + "</div>";
+  return '<div class="fin-monthnav"><button type="button" class="icon-toggle" data-fm="-1" title="' + escapeHtml(t("finPrevMonth")) + '" aria-label="' + escapeHtml(t("finPrevMonth")) + '">' + svgIcon("chev-l") + "</button>" +
+    "<b>" + escapeHtml(monthLabelOf(finView.month)) + '</b><button type="button" class="icon-toggle" data-fm="1" title="' + escapeHtml(t("finNextMonth")) + '" aria-label="' + escapeHtml(t("finNextMonth")) + '">' + svgIcon("chev-r") + "</button>" +
+    (isNow ? "" : '<button type="button" class="icon-toggle" data-fm="now" title="' + escapeHtml(t("finThisMonth")) + '" aria-label="' + escapeHtml(t("finThisMonth")) + '">' + svgIcon("calendar") + "</button>") + "</div>";
 }
 function addButtonsHtml() {
-  return '<div class="fin-addbtns"><button type="button" class="btn-ghost-sm" data-finadd="income">' + svgIcon("plus") + "<span>" + escapeHtml(t("finIncome")) + "</span></button>" +
+  return '<div class="fin-addbtns"><button type="button" class="btn-ghost-sm" data-finadd="income">' + svgIcon("arrow-in") + "<span>" + escapeHtml(t("finIncome")) + "</span></button>" +
     '<button type="button" class="btn-primary" data-finadd="expense">' + svgIcon("plus") + "<span>" + escapeHtml(t("finExpense")) + "</span></button></div>";
 }
 function rowKindLabel(r) { return r.src === "order" ? t(PAY_KIND_KEY[r.kind] || "finKindPaid") : ""; }
-function finRowHtml(r) {
-  var c = finCatById(r.cat);
-  var title = r.note || finCatName(c);
+// title / subtitle / dot colour of a ledger row (shared by the list and the Home ledger)
+function finRowInfo(r) {
+  var c = finCatById(r.cat), multi = finAccts().length > 1;
+  var info = { title: r.note || finCatName(c), color: finCatColor(c), icon: "" };
   var sub = escapeHtml(finCatName(c));
-  if (r.src === "order") sub = escapeHtml(rowKindLabel(r)) + ' <span class="htag" style="color:var(--accent-ink)">' + escapeHtml(t("finFromOrder")) + "</span>";
+  if (r.type === "transfer") {
+    info.title = r.note || t("finTransferRow"); info.color = "var(--text-faint)";
+    sub = escapeHtml(acctName(finRowAcct(r)) + " → " + acctName(r.to));
+  } else if (r.src === "order") {
+    sub = '<span class="frow-src" title="' + escapeHtml(t("finFromOrder")) + '">' + svgIcon("bag") + "</span>" + escapeHtml(rowKindLabel(r));
+    if (multi) sub += " · " + escapeHtml(acctName(finRowAcct(r)));
+  } else if (multi) sub += " · " + escapeHtml(acctName(finRowAcct(r)));
+  info.sub = sub;
+  return info;
+}
+function finRowHtml(r) {
+  var i = finRowInfo(r);
   return '<button type="button" class="frow" data-src="' + r.src + '" data-id="' + escapeHtml(r.id) + '"' + (r.orderId ? ' data-order="' + r.orderId + '"' : "") + ">" +
-    '<span class="frow-dot" style="background:' + finCatColor(c) + '"></span>' +
-    '<span class="frow-main"><span class="frow-t">' + escapeHtml(title) + '</span><span class="frow-s">' + sub + "</span></span>" +
-    '<span class="frow-r' + (r.type === "income" ? " up" : "") + '">' + signedYen(r) + "</span></button>";
+    '<span class="frow-dot" style="background:' + i.color + '"></span>' +
+    '<span class="frow-main"><span class="frow-t">' + escapeHtml(i.title) + '</span><span class="frow-s">' + i.sub + "</span></span>" +
+    '<span class="frow-r' + (r.type === "income" ? " inc" : r.type === "transfer" ? " xfer" : "") + '">' + signedYen(r) + "</span></button>";
+}
+// The same row as a line of the Home "today" page
+function finLedgerRowHtml(r) {
+  var i = finRowInfo(r);
+  return '<button type="button" class="frow lrow" data-src="' + r.src + '" data-id="' + escapeHtml(r.id) + '"' + (r.orderId ? ' data-order="' + r.orderId + '"' : "") + ">" +
+    '<span class="l-lab">' + escapeHtml(shortDate(r.date)) + "</span>" +
+    '<span class="frow-dot l-ico" style="background:' + i.color + '"></span>' +
+    '<span class="l-t"><span class="frow-t">' + escapeHtml(i.title) + '</span><span class="l-s frow-s">' + i.sub + "</span></span>" +
+    '<span class="l-r frow-r' + (r.type === "income" ? " inc" : r.type === "transfer" ? " xfer" : "") + '">' + signedYen(r) + "</span></button>";
 }
 
 function expenseByCat(rows) {
@@ -240,7 +291,7 @@ function catBarsHtml(rows, limit) {
     var over = bud && i.amt > bud;
     return '<button type="button" class="fbar' + (over ? " over" : "") + '" data-fcat="' + (i.c ? i.c.id : "") + '">' +
       '<span class="fbar-name"><i style="background:' + finCatColor(i.c) + '"></i>' + escapeHtml(finCatName(i.c)) + "</span>" +
-      '<span class="fbar-track"><i style="width:' + pct + "%;background:" + (over ? "var(--due-ink)" : finCatColor(i.c)) + '"></i></span>' +
+      '<span class="fbar-track"><i style="width:' + pct + "%;background:" + finCatColor(i.c) + '"></i></span>' +
       '<span class="fbar-v">' + yen(i.amt) + (bud ? "<small>/ " + yen(bud) + "</small>" : "") + "</span></button>";
   }).join("") + "</div>";
 }
@@ -248,22 +299,66 @@ function vsPrevHtml(cur, prev) {
   if (!(prev > 0)) return "";
   var pct = Math.round((cur - prev) / prev * 100);
   if (pct === 0) return escapeHtml(t("finSameAsPrev"));
-  return '<span class="' + (pct > 0 ? "dn" : "up") + '">' + (pct > 0 ? "▲ " : "▼ ") + Math.abs(pct) + "%</span> " + escapeHtml(t("finVsPrev"));
+  return '<span class="' + (pct > 0 ? "dn" : "inc") + '">' + (pct > 0 ? "▲ " : "▼ ") + Math.abs(pct) + "%</span> " + escapeHtml(t("finVsPrev"));
 }
+function finBalanceHtml(bal) { return '<span class="' + (bal < 0 ? "dn" : "") + '">' + (bal < 0 ? "−" : "") + yen(Math.abs(bal)) + "</span>"; }
 
-function renderFinOverview() {
-  var box = el("finOverviewBody");
-  if (!fin.loaded) { box.innerHTML = ""; return; }
+function renderFin() {
+  var box = el("finBody"), tools = el("finTools");
+  if (!fin.loaded) { box.innerHTML = ""; tools.innerHTML = ""; return; }
+  tools.innerHTML = addButtonsHtml();
   var key = finView.month, all = finAllRows();
   var byMonth = {};
   all.forEach(function (r) { var k = r.date ? r.date.slice(0, 7) : ""; if (k) (byMonth[k] = byMonth[k] || []).push(r); });
   var rows = byMonth[key] || [], tot = finTotals(rows), prev = finTotals(byMonth[shiftMonthKey(key, -1)] || []);
-  var html = '<div class="fin-toolbar">' + monthNavHtml() + addButtonsHtml() + "</div>";
-  html += '<div class="fin-stats">' +
-    '<div class="hw"><h4>' + svgIcon("arrow-in") + escapeHtml(t("finIncome")) + '</h4><div class="big up">' + yen(tot.income) + "</div></div>" +
-    '<div class="hw"><h4>' + svgIcon("wallet") + escapeHtml(t("finExpense")) + '</h4><div class="big">' + yen(tot.expense) + '</div><div class="sub">' + vsPrevHtml(tot.expense, prev.expense) + "</div></div>" +
-    '<div class="hw"><h4>' + svgIcon("chart") + escapeHtml(t("finLeft")) + '</h4><div class="big ' + (tot.balance < 0 ? "dn" : "up") + '">' + (tot.balance < 0 ? "−" : "") + yen(Math.abs(tot.balance)) + "</div></div></div>";
-  // 6-month trend (ending at the selected month)
+  var shown = rows.filter(function (r) {
+    return (finView.type === "all" || r.type === finView.type) && (!finView.acct || finRowAcct(r) === finView.acct || r.to === finView.acct) && (!finView.cat || (finView.cat === "__none" ? !finCatById(r.cat) : r.cat === finView.cat));
+  });
+
+  // ---- filter row: month · type · category (icons, same pattern as the orders toolbar) ----
+  var catOpts = '<option value="">' + escapeHtml(t("finAllCats")) + "</option>" + finCats().map(function (c) {
+    return '<option value="' + c.id + '"' + (finView.cat === c.id ? " selected" : "") + ">" + escapeHtml(finCatName(c)) + "</option>";
+  }).join("");
+  var typeBtns = [["all", "all", "chipAll"], ["expense", "arrow-out", "finExpense"], ["income", "arrow-in", "finIncome"]].map(function (k) {
+    return '<button type="button" class="icon-toggle' + (finView.type === k[0] ? " is-active" : "") + '" data-ftype="' + k[0] + '" title="' + escapeHtml(t(k[2])) + '" aria-label="' + escapeHtml(t(k[2])) + '">' + svgIcon(k[1]) + "</button>";
+  }).join("");
+  var acctOpts = "";
+  if (finAccts().length > 1) {
+    acctOpts = '<div class="select-wrap' + (finView.acct ? " is-active" : "") + '" title="' + escapeHtml(t("finFilterAcctTitle")) + '">' + svgIcon("bank") +
+      '<select class="field-select" id="finAcctSel" aria-label="' + escapeHtml(t("finFilterAcctTitle")) + '"><option value="">' + escapeHtml(t("finAllAccts")) + "</option>" +
+      finAccts().map(function (a) { return '<option value="' + a.id + '"' + (finView.acct === a.id ? " selected" : "") + ">" + escapeHtml(a.name) + "</option>"; }).join("") + "</select></div>";
+  }
+  var html = finSubnavHtml("fin") + '<div class="fin-filters">' + monthNavHtml() + '<span class="sp"></span><div class="fin-types">' + typeBtns + "</div>" + acctOpts +
+    '<div class="select-wrap' + (finView.cat ? " is-active" : "") + '" title="' + escapeHtml(t("finFilterCatTitle")) + '">' + svgIcon("tag") +
+    '<select class="field-select" id="finCatSel" aria-label="' + escapeHtml(t("finFilterCatTitle")) + '">' + catOpts + "</select></div></div>";
+  if (finView.cat) {
+    var fc = finCatById(finView.cat);
+    html += '<button type="button" class="fchip" data-fcat-clear title="' + escapeHtml(t("finClearFilter")) + '"><i style="background:' + finCatColor(fc) + '"></i>' +
+      escapeHtml(finCatName(fc)) + svgIcon("close") + "</button>";
+  }
+
+  // ---- list (left) ----
+  var list = '<section class="fin-list">';
+  if (!shown.length) list += '<div class="hempty wide">' + escapeHtml(t("finNoRows")) + "</div>";
+  else {
+    var groups = [], cur = null;
+    finSortRows(shown).forEach(function (r) {
+      if (!cur || cur.date !== r.date) { cur = { date: r.date, rows: [], net: 0 }; groups.push(cur); }
+      cur.rows.push(r); if (r.type !== "transfer") cur.net += (r.type === "income" ? 1 : -1) * r.amount;
+    });
+    groups.forEach(function (g) {
+      list += '<div class="fin-day"><span>' + escapeHtml(formatDateLong(g.date)) + "</span><span>" + (g.net < 0 ? "−" : "+") + yen(Math.abs(g.net)) + "</span></div>" +
+        '<div class="box fin-box">' + g.rows.map(finRowHtml).join("") + "</div>";
+    });
+  }
+  list += "</section>";
+
+  // ---- summary + side cards (right on wide screens) ----
+  var sum = '<section class="box fin-sumcard">' +
+    '<div class="kv"><span class="kv-l">' + svgIcon("arrow-in") + escapeHtml(t("finIncome")) + '</span><b class="inc">' + yen(tot.income) + "</b></div>" +
+    '<div class="kv"><span class="kv-l">' + svgIcon("arrow-out") + escapeHtml(t("finExpense")) + "</span><b>" + yen(tot.expense) + "</b></div>" +
+    (prev.expense > 0 ? '<div class="kv-sub">' + vsPrevHtml(tot.expense, prev.expense) + "</div>" : "") +
+    '<div class="kv kv-left"><span class="kv-l">' + svgIcon("wallet") + escapeHtml(t("finLeft")) + "</span><b>" + finBalanceHtml(tot.balance) + "</b></div></section>";
   var months = [], max = 1;
   for (var i = 5; i >= 0; i--) {
     var mk = shiftMonthKey(key, -i), tt = finTotals(byMonth[mk] || []);
@@ -274,42 +369,11 @@ function renderFinOverview() {
     return '<button type="button" class="fcol' + (m.key === key ? " on" : "") + '" data-fmset="' + m.key + '"><span class="fcol-bars">' +
       '<i class="inc" style="height:' + Math.round(m.inc / max * 100) + '%"></i><i class="exp" style="height:' + Math.round(m.exp / max * 100) + '%"></i></span>' +
       '<span class="fcol-l">' + escapeHtml(monthLabelOf(m.key, true)) + "</span></button>";
-  }).join("") + "</div>" +
-    '<div class="fleg"><span><i class="inc"></i>' + escapeHtml(t("finIncome")) + '</span><span><i class="exp"></i>' + escapeHtml(t("finExpense")) + "</span></div>";
-  html += '<div class="fin-grid">' +
-    '<div class="hw"><h4 class="hw-h">' + escapeHtml(t("finByCategory")) + "</h4>" + catBarsHtml(rows) + "</div>" +
-    '<div class="hw"><h4 class="hw-h">' + escapeHtml(t("finTrend")) + "</h4>" + chart + "</div></div>";
-  var recent = finSortRows(rows).slice(0, 6);
-  html += '<div class="hw fin-recent"><h4 class="hw-h">' + escapeHtml(t("finRecent")) + '<a class="hw-more" href="#/fin-list">' + escapeHtml(t("seeAll")) + "</a></h4>" +
-    (recent.length ? recent.map(finRowHtml).join("") : '<div class="hempty">' + escapeHtml(t("finNoRows")) + "</div>") + "</div>";
-  box.innerHTML = html;
-}
+  }).join("") + "</div>";
+  var more = '<section class="box fin-more"><h4 class="fin-h">' + svgIcon("tag") + escapeHtml(t("finByCategory")) + "</h4>" + catBarsHtml(rows) +
+    '<h4 class="fin-h">' + svgIcon("chart") + escapeHtml(t("finTrend")) + "</h4>" + chart + "</section>";
 
-function renderFinList() {
-  var box = el("finListBody");
-  if (!fin.loaded) { box.innerHTML = ""; return; }
-  var rows = finRowsOfMonth(finView.month), tot = finTotals(rows);
-  var shown = rows.filter(function (r) {
-    return (finView.type === "all" || r.type === finView.type) && (!finView.cat || (finView.cat === "__none" ? !finCatById(r.cat) : r.cat === finView.cat));
-  });
-  var catOpts = '<option value="">' + escapeHtml(t("finAllCats")) + "</option>" + finCats().map(function (c) {
-    return '<option value="' + c.id + '"' + (finView.cat === c.id ? " selected" : "") + ">" + escapeHtml(finCatName(c)) + "</option>";
-  }).join("");
-  var html = '<div class="fin-toolbar">' + monthNavHtml() + addButtonsHtml() + "</div>" +
-    '<div class="fin-filters"><div class="fseg" role="group">' +
-    ["all", "expense", "income"].map(function (k) {
-      return '<button type="button" class="fseg-btn' + (finView.type === k ? " on" : "") + '" data-ftype="' + k + '">' + escapeHtml(t(k === "all" ? "chipAll" : (k === "expense" ? "finExpense" : "finIncome"))) + "</button>";
-    }).join("") + '</div><select class="fin-select" id="finCatSel">'+ catOpts + "</select></div>" +
-    '<div class="fin-sum"><span>' + escapeHtml(t("finIncome")) + ' <b class="up">' + yen(tot.income) + "</b></span><span>" + escapeHtml(t("finExpense")) + " <b>" + yen(tot.expense) + "</b></span></div>";
-  if (!shown.length) html += '<div class="hempty wide">' + escapeHtml(t("finNoRows")) + "</div>";
-  else {
-    var last = "";
-    finSortRows(shown).forEach(function (r) {
-      if (r.date !== last) { last = r.date; html += '<div class="fin-day">' + escapeHtml(formatDateLong(r.date)) + "</div>"; }
-      html += finRowHtml(r);
-    });
-  }
-  box.innerHTML = html;
+  box.innerHTML = html + '<div class="fin-layout">' + list + sum + more + "</div>";
 }
 
 function renderFinCats() {
@@ -317,27 +381,39 @@ function renderFinCats() {
   if (!fin.loaded) { box.innerHTML = ""; return; }
   function sec(type) {
     var cats = finCats(type);
-    return '<div class="fin-catsec"><div class="fin-cathead"><h3>' + escapeHtml(t(type === "expense" ? "finExpense" : "finIncome")) + '</h3><button type="button" class="btn-ghost-sm" data-catnew="' + type + '">' +
-      svgIcon("plus") + "<span>" + escapeHtml(t("finCatNew")) + "</span></button></div>" +
-      cats.map(function (c) {
+    return '<section class="fin-catsec"><div class="fin-cathead"><h3>' + svgIcon(type === "expense" ? "arrow-out" : "arrow-in") + escapeHtml(t(type === "expense" ? "finExpense" : "finIncome")) +
+      '</h3><button type="button" class="icon-toggle" data-catnew="' + type + '" title="' + escapeHtml(t("finCatNew")) + '" aria-label="' + escapeHtml(t("finCatNew")) + '">' + svgIcon("plus") + "</button></div>" +
+      '<div class="box fin-box">' + cats.map(function (c) {
         return '<button type="button" class="frow" data-catedit="' + c.id + '"><span class="frow-dot" style="background:' + finCatColor(c) + '"></span>' +
           '<span class="frow-main"><span class="frow-t">' + escapeHtml(finCatName(c)) + "</span>" +
           (type === "expense" ? '<span class="frow-s">' + escapeHtml(c.budget > 0 ? t("finBudgetLine", { n: money(c.budget) }) : t("finNoBudget")) + "</span>" : "") +
           '</span><span class="frow-r">' + svgIcon("chev-r") + "</span></button>";
-      }).join("") + "</div>";
+      }).join("") + "</div></section>";
   }
-  box.innerHTML = '<p class="fin-hint">' + escapeHtml(t("finCatsHint")) + "</p>" + sec("expense") + sec("income");
+  box.innerHTML = finSubnavHtml("fin-cats") + '<p class="fin-hint">' + escapeHtml(t("finCatsHint")) + '</p><div class="fin-catcols">' + sec("expense") + sec("income") + "</div>";
 }
 
+var FIN_PAGES = ["fin", "fin-acc", "fin-rec", "fin-cats"];
+function finSubnavHtml(page) {
+  var items = [["fin", "wallet", "navFinList"], ["fin-acc", "bank", "navFinAcc"], ["fin-rec", "repeat", "navFinRec"], ["fin-cats", "tag", "navFinCats"]];
+  return '<nav class="fin-subnav" aria-label="' + escapeHtml(t("navGroupFinance")) + '">' + items.map(function (i) {
+    return '<a class="chip' + (i[0] === page ? " active" : "") + '" href="#/' + i[0] + '"' + (i[0] === page ? ' aria-current="page"' : "") + ">" + svgIcon(i[1]) + "<span>" + escapeHtml(t(i[2])) + "</span></a>";
+  }).join("") + "</nav>";
+}
 function finRenderPage(page) {
-  if (page === "fin-overview") renderFinOverview();
-  else if (page === "fin-list") renderFinList();
+  if (page === "fin") renderFin();
   else if (page === "fin-cats") renderFinCats();
+  else if (page === "fin-acc") renderFinAcc();
+  else if (page === "fin-rec") renderFinRec();
 }
 function finRenderAll() {
-  if (typeof currentPageId === "string" && currentPageId.indexOf("fin-") === 0) finRenderPage(currentPageId);
+  if (FIN_PAGES.indexOf(currentPageId) !== -1) finRenderPage(currentPageId);
   if (typeof renderHome === "function" && currentPageId === "home") renderHome();
   if (typeof renderNav === "function") renderNav();
+}
+function finShowCategory(catId) {
+  finView.cat = catId || "__none"; finView.type = "expense"; finView.month = monthKeyOf(new Date());
+  if (currentPageId === "fin") finRenderAll(); else navigate("fin");
 }
 
 // ================= home widgets =================
@@ -349,18 +425,18 @@ function finMonthRows() { return finRowsOfMonth(monthKeyOf(new Date())); }
   } };
   var left = { id: "fin-left", titleKey: "wFinLeft", size: "s", icon: "chart", render: function (b) {
     var cur = finTotals(finMonthRows());
-    b.innerHTML = '<div class="big ' + (cur.balance < 0 ? "dn" : "up") + '">' + (cur.balance < 0 ? "−" : "") + yen(Math.abs(cur.balance)) + '</div><div class="sub">' +
+    b.innerHTML = '<div class="big">' + finBalanceHtml(cur.balance) + '</div><div class="sub">' +
       escapeHtml(t("finIncomeSub", { n: money(cur.income) })) + "</div>";
   } };
-  var cats = { id: "fin-cats", titleKey: "wFinCats", size: "m", more: { page: "fin-overview" }, render: function (b) {
+  var cats = { id: "fin-cats", titleKey: "wFinCats", size: "m", more: { page: "fin" }, render: function (b) {
     b.innerHTML = catBarsHtml(finMonthRows(), 5);
   } };
-  var recent = { id: "fin-recent", titleKey: "wFinRecent", size: "m", more: { page: "fin-list" }, render: function (b) {
+  var recent = { id: "fin-recent", titleKey: "wFinRecent", size: "m", ledger: true, more: { page: "fin" }, render: function (b) {
     var rows = finSortRows(finMonthRows()).slice(0, 5);
-    b.innerHTML = rows.length ? rows.map(finRowHtml).join("") : '<div class="hempty">' + escapeHtml(t("finNoRows")) + "</div>";
+    b.innerHTML = rows.length ? rows.map(finLedgerRowHtml).join("") : '<div class="hempty">' + escapeHtml(t("finNoRows")) + "</div>";
   } };
   HOME_WIDGETS.unshift(left); HOME_WIDGETS.unshift(spend);
-  var idx = HOME_WIDGETS.findIndex(function (w) { return w.id === "due-soon"; });
+  var idx = HOME_WIDGETS.findIndex(function (w) { return w.id === "incoming"; });
   HOME_WIDGETS.splice(idx, 0, cats);
   var ri = HOME_WIDGETS.findIndex(function (w) { return w.id === "recent-orders"; });
   HOME_WIDGETS.splice(ri, 0, recent);
@@ -370,8 +446,10 @@ function finMonthRows() { return finRowsOfMonth(monthKeyOf(new Date())); }
 function initFinance() {
   QUICK_ADDS.unshift(
     { id: "expense", primary: true, icon: "wallet", labelKey: "finAddExpense", run: function () { openTxModal(null, "expense"); } },
-    { id: "income", icon: "arrow-in", labelKey: "finAddIncome", run: function () { openTxModal(null, "income"); } }
+    { id: "income", icon: "arrow-in", labelKey: "finAddIncome", run: function () { openTxModal(null, "income"); } },
+    { id: "transfer", icon: "swap", labelKey: "finAddTransfer", hidden: function () { return finAccts().length < 2; }, run: function () { openTxModal(null, "transfer"); } }
   );
+  if (typeof initFinAcc === "function") initFinAcc();
   // modals
   el("closeTxModal").addEventListener("click", closeTxModal);
   el("cancelTxForm").addEventListener("click", closeTxModal);
@@ -401,11 +479,11 @@ function initFinance() {
     if (cb) cb(v);
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") { closeTxModal(); closeCatModal(); closePayDialog(); }
+    if (e.key === "Escape") { closeTxModal(); closeCatModal(); closePayDialog(); if (typeof closeAcctModal === "function") { closeAcctModal(); closeRecModal(); } }
   });
 
   // pages (event delegation on the three containers)
-  ["finOverviewBody", "finListBody", "finCatsBody"].forEach(function (id) {
+  ["finBody", "finTools", "finCatsBody", "finAccBody", "finAccTools", "finRecBody", "finRecTools"].forEach(function (id) {
     el(id).addEventListener("click", function (e) {
       var b;
       if ((b = e.target.closest("[data-fm]"))) {
@@ -416,14 +494,17 @@ function initFinance() {
       if ((b = e.target.closest("[data-fmset]"))) { finView.month = b.getAttribute("data-fmset"); finRenderAll(); return; }
       if ((b = e.target.closest("[data-finadd]"))) { openTxModal(null, b.getAttribute("data-finadd")); return; }
       if ((b = e.target.closest("[data-ftype]"))) { finView.type = b.getAttribute("data-ftype"); finRenderAll(); return; }
-      if ((b = e.target.closest("[data-fcat]"))) { finView.cat = b.getAttribute("data-fcat") || "__none"; finView.type = "expense"; navigate("fin-list"); return; }
+      if ((b = e.target.closest("[data-fcat-clear]"))) { finView.cat = ""; finRenderAll(); return; }
+      if ((b = e.target.closest("[data-fcat]"))) { var keep = finView.month; finShowCategory(b.getAttribute("data-fcat")); finView.month = keep; finRenderAll(); return; }
       if ((b = e.target.closest("[data-catnew]"))) { openCatModal(null, b.getAttribute("data-catnew")); return; }
       if ((b = e.target.closest("[data-catedit]"))) { openCatModal(b.getAttribute("data-catedit")); return; }
-      if ((b = e.target.closest(".frow[data-src]"))) { openFinRow(b); }
+      if ((b = e.target.closest(".frow[data-src]"))) { openFinRow(b); return; }
+      if (typeof finAccClick === "function") finAccClick(e);
     });
   });
-  el("finListBody").addEventListener("change", function (e) {
+  el("finBody").addEventListener("change", function (e) {
     if (e.target.id === "finCatSel") { finView.cat = e.target.value; finRenderAll(); }
+    if (e.target.id === "finAcctSel") { finView.acct = e.target.value; finRenderAll(); }
   });
   // rows inside home widgets
   el("homeGrid").addEventListener("click", function (e) {
@@ -431,7 +512,7 @@ function initFinance() {
     var b = e.target.closest(".frow[data-src]");
     if (b) openFinRow(b);
     var f = e.target.closest("[data-fcat]");
-    if (f) { finView.cat = f.getAttribute("data-fcat") || "__none"; finView.type = "expense"; finView.month = monthKeyOf(new Date()); navigate("fin-list"); }
+    if (f) finShowCategory(f.getAttribute("data-fcat"));
   });
 }
 function openFinRow(b) {

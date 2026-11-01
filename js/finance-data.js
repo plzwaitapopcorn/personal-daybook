@@ -53,7 +53,7 @@ function finInitMaps() {
 function readFinLS() {
   try { var a = JSON.parse(localStorage.getItem(FIN_LS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
 }
-function finValid(x) { return x && typeof x.id === "string" && (x.kind === "tx" || x.kind === "cat"); }
+function finValid(x) { return x && typeof x.id === "string" && (x.kind === "tx" || x.kind === "cat" || x.kind === "acct" || x.kind === "rec"); }
 
 function finSeedDefaults() {
   var seeded = false;
@@ -158,6 +158,88 @@ function finCats(type) {
   return fin.items.filter(function (x) { return x.kind === "cat" && (!type || x.type === type); })
     .sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); });
 }
+// ---- accounts (bank / credit card / cash) ----
+// acct: { kind:"acct", type:"bank"|"card"|"cash", name, color, opening, limit, cutoff, due, main, sort }
+// `opening` is signed (a card owing 5,000 has opening -5,000). Balance = opening + everything booked to it.
+var ACCT_TYPES = ["bank", "card", "cash"];
+var ACCT_COLORS = ["#dfeafa", "#2b2d36", "#f4ead0", "#e3f1e6", "#f3dfe9", "#e6e0f5"];
+function finAccts() {
+  return fin.items.filter(function (x) { return x.kind === "acct"; }).sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); });
+}
+function finAcctById(id) {
+  for (var i = 0; i < fin.items.length; i++) if (fin.items[i].kind === "acct" && fin.items[i].id === id) return fin.items[i];
+  return null;
+}
+function finMainAcct() {
+  var a = finAccts();
+  for (var i = 0; i < a.length; i++) if (a[i].main) return a[i];
+  return a[0] || null;
+}
+// The account a row belongs to (rows from before accounts existed fall back to the main one).
+function finRowAcct(r) { return (r.acct && finAcctById(r.acct)) ? r.acct : (finMainAcct() ? finMainAcct().id : ""); }
+// Net effect of all rows on one account.
+function finAcctNet(id) {
+  var net = 0;
+  finAllRows().forEach(function (r) {
+    if (r.type === "transfer") {
+      if (finRowAcct(r) === id) net -= r.amount;
+      if (r.to === id) net += r.amount;
+    } else if (finRowAcct(r) === id) net += (r.type === "income" ? 1 : -1) * r.amount;
+  });
+  return net;
+}
+function finAcctBalance(a) { return (Number(a.opening) || 0) + finAcctNet(a.id); }
+// Cards: money owed (positive). Others: 0.
+function finCardOwed(a) { return Math.max(0, -finAcctBalance(a)); }
+// Net worth = everything held minus everything owed on cards.
+function finNetWorth() { return finAccts().reduce(function (s, a) { return s + finAcctBalance(a); }, 0); }
+function finDateStr(y, m, d) { return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(Math.min(d, new Date(y, m + 1, 0).getDate())).padStart(2, "0"); }
+// Next occurrence (today or later) of day-of-month `day`, as YYYY-MM-DD.
+function nextDayOfMonth(day, from) {
+  var now = from ? new Date(from + "T00:00:00") : new Date(), y = now.getFullYear(), m = now.getMonth();
+  var s = finDateStr(y, m, day);
+  if (s < dateOfStamp(now.getTime())) s = finDateStr(m === 11 ? y + 1 : y, (m + 1) % 12, day);
+  return s;
+}
+function daysUntil(dateStr) {
+  var a = new Date(todayStr() + "T00:00:00"), b = new Date(dateStr + "T00:00:00");
+  return Math.round((b - a) / 86400000);
+}
+// Spending on a card in its current statement cycle (after the last cut-off, up to today).
+function finCardCycle(a) {
+  var cut = parseInt(a.cutoff, 10) || 0;
+  if (!cut) return null;
+  var next = nextDayOfMonth(cut), p = next.split("-"), y = +p[0], m = +p[1] - 1;
+  var prev = finDateStr(m === 0 ? y - 1 : y, (m + 11) % 12, cut);
+  var spent = 0;
+  finAllRows().forEach(function (r) {
+    if (r.type === "expense" && finRowAcct(r) === a.id && r.date > prev && r.date <= next) spent += r.amount;
+  });
+  return { from: prev, to: next, spent: spent };
+}
+
+// ---- recurring plan ----
+// rec: { kind:"rec", name, type:"income"|"expense", amount, every (months), start "YYYY-MM", count (0 = no end), invest, sort }
+function finRecs() { return fin.items.filter(function (x) { return x.kind === "rec"; }).sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); }); }
+function monthIndex(key) { var p = key.split("-"); return parseInt(p[0], 10) * 12 + parseInt(p[1], 10) - 1; }
+function recEndKey(r) { return r.count > 0 ? shiftMonthKey(r.start, (r.count - 1) * (r.every || 1)) : ""; }
+// "due" | "none" | "done" (an instalment plan that has finished)
+function recStateIn(r, key) {
+  var d = monthIndex(key) - monthIndex(r.start), ev = r.every || 1;
+  if (d < 0) return "none";
+  if (r.count > 0 && d > (r.count - 1) * ev) return "done";
+  return d % ev === 0 ? "due" : "none";
+}
+function recAmountIn(r, key) { return recStateIn(r, key) === "due" ? (Number(r.amount) || 0) : 0; }
+function recTotals(key) {
+  var inc = 0, exp = 0, inv = 0;
+  finRecs().forEach(function (r) {
+    var a = recAmountIn(r, key);
+    if (r.type === "income") inc += a; else if (r.invest) inv += a; else exp += a;
+  });
+  return { income: inc, expense: exp, invest: inv, left: inc - exp - inv };
+}
+
 function finTxs() { return fin.items.filter(function (x) { return x.kind === "tx"; }); }
 function finCatById(id) {
   for (var i = 0; i < fin.items.length; i++) if (fin.items[i].kind === "cat" && fin.items[i].id === id) return fin.items[i];
@@ -177,7 +259,7 @@ function orderPayments(o) {
   function add(type, amount, date, kind) {
     if (!(amount > 0)) return;
     rows.push({ src: "order", id: o.id + ":" + kind, orderId: o.id, type: type, amount: amount, date: date,
-      cat: type === "income" ? "cat-refund" : "cat-orders", note: name, kind: kind });
+      cat: type === "income" ? "cat-refund" : "cat-orders", note: name, kind: kind, acct: o.acct || "" });
   }
   if (o.status === "cancelled") {
     var paid = o.paidFullDate ? full : dep;
@@ -201,7 +283,7 @@ function orderPaidTotal(o) {
 function finAllRows() {
   var rows = [];
   finTxs().forEach(function (x) {
-    rows.push({ src: "tx", id: x.id, type: x.type, amount: Number(x.amount) || 0, date: x.date || "", cat: x.cat, note: x.note || "" });
+    rows.push({ src: "tx", id: x.id, type: x.type, amount: Number(x.amount) || 0, date: x.date || "", cat: x.cat, note: x.note || "", acct: x.acct || "", to: x.to || "" });
   });
   state.orders.forEach(function (o) { orderPayments(o).forEach(function (r) { rows.push(r); }); });
   return rows;
@@ -211,7 +293,7 @@ function finRowsOfMonth(key) {
 }
 function finTotals(rows) {
   var inc = 0, exp = 0;
-  rows.forEach(function (r) { if (r.type === "income") inc += r.amount; else exp += r.amount; });
+  rows.forEach(function (r) { if (r.type === "income") inc += r.amount; else if (r.type !== "transfer") exp += r.amount; });
   return { income: inc, expense: exp, balance: inc - exp };
 }
 function finSortRows(rows) {
@@ -242,4 +324,13 @@ function financeOnStatusChange(o, oldStatus) {
     if (bal > 0) return { amount: bal, prevDate: prev };
   }
   return null;
+}
+
+
+// When the very first account is created, every existing record (manual and order-derived) is booked to it.
+function finAssignAllToAcct(id) {
+  finTxs().forEach(function (x) { if (!x.acct) x.acct = id; });
+  var touched = false;
+  state.orders.forEach(function (o) { if (!o.acct) { o.acct = id; touched = true; } });
+  if (touched && typeof saveData === "function") saveData();
 }

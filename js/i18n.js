@@ -53,6 +53,7 @@ function applyStaticTranslations() {
   if (typeof renderSyncUI === "function") renderSyncUI();
   if (typeof renderNav === "function") { renderNav(); renderNavAccount(); }
   if (typeof renderHome === "function") renderHome();
+  if (typeof finRenderAll === "function" && typeof fin !== "undefined" && fin.loaded) finRenderAll();
 }
 
 function setLang(lang) {

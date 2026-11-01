@@ -24,7 +24,7 @@ function applyAppearance() {
   root.style.setProperty("--accent-ink", pr.ink);
   root.style.setProperty("--on-accent", pr.on);
   var mt = document.getElementById("metaTheme");
-  if (mt) mt.setAttribute("content", mode === "light" ? "#f7f7f8" : "#121212");   // browser bar / installed-app title bar
+  if (mt) mt.setAttribute("content", mode === "light" ? "#f6f5f1" : "#17181c");   // browser bar / installed-app title bar
   renderAppearanceMenu();
 }
 function renderAppearanceMenu() {
@@ -52,12 +52,12 @@ function renderAppearanceMenu() {
   });
 }
 function loadAppearancePref() {
-  var theme = "dark", primary = "teal";
+  var theme = "light", primary = "red";
   try {
     var saved = localStorage.getItem(THEME_KEY);
     // Older saved choices (pastel) map to the closest remaining mode.
     if (saved === "pastel") saved = "light";
-    theme = saved === "light" ? "light" : "dark";
+    theme = saved === "dark" ? "dark" : (saved === "light" ? "light" : "light");
     var sp = localStorage.getItem(PRIMARY_KEY);
     if (PRIMARIES.some(function (p) { return p.id === sp; })) primary = sp;
   } catch (e) { /* ignore */ }

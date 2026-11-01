@@ -5,9 +5,9 @@
 
 var NAV_ITEMS = [
   { page: "home",         icon: "home",   labelKey: "navHome",        tabKey: "navHome",      group: "" },
-  { page: "fin-overview", icon: "chart",  labelKey: "navFinOverview", tabKey: "navFinTab",    group: "navGroupFinance", tileKey: "navGroupFinance", tileIcon: "wallet",
-    tileSub: function () { return t("tileFinSub", { n: money(finTotals(finRowsOfMonth(monthKeyOf(new Date()))).expense) }); } },
-  { page: "fin-list",     icon: "list",   labelKey: "navFinList",     group: "navGroupFinance" },
+  { page: "fin",          icon: "wallet", labelKey: "navFinList",     tabKey: "navFinTab",    group: "navGroupFinance" },
+  { page: "fin-acc",      icon: "bank",   labelKey: "navFinAcc",      group: "navGroupFinance" },
+  { page: "fin-rec",      icon: "repeat", labelKey: "navFinRec",      group: "navGroupFinance" },
   { page: "fin-cats",     icon: "tag",    labelKey: "navFinCats",     group: "navGroupFinance" },
   { page: "orders",       icon: "bag",    labelKey: "navOrders",      tabKey: "navOrdersTab", group: "navGroupOrders", tileKey: "navGroupOrders",
     count: function () { return state.orders.length; },
@@ -19,12 +19,14 @@ var QUICK_ADDS = [
   { id: "order", icon: "bag", labelKey: "addOrderBtn", run: function () { openOrderModal(); } }
 ];
 
-var PAGE_IDS = ["home", "fin-overview", "fin-list", "fin-cats", "orders", "settings"];
+var PAGE_IDS = ["home", "fin", "fin-acc", "fin-rec", "fin-cats", "orders", "settings"];
+var PAGE_ALIAS = { "fin-overview": "fin", "fin-list": "fin" };   // old bookmarks / links
 var currentPageId = "";
 
 function pageFromHash() {
   var m = /^#\/([a-z-]+)/.exec(location.hash || "");
-  return (m && PAGE_IDS.indexOf(m[1]) !== -1) ? m[1] : "home";
+  var id = m ? (PAGE_ALIAS[m[1]] || m[1]) : "";
+  return PAGE_IDS.indexOf(id) !== -1 ? id : "home";
 }
 
 function navigate(page) {
@@ -46,7 +48,7 @@ function showPage(page) {
     if (page !== "home" && typeof homeEditOff === "function") homeEditOff();
   }
   if (page === "home" && typeof renderHome === "function") renderHome();
-  if (page.indexOf("fin-") === 0 && typeof finRenderPage === "function") finRenderPage(page);
+  if ((page === "fin" || page === "fin-acc" || page === "fin-rec" || page === "fin-cats") && typeof finRenderPage === "function") finRenderPage(page);
   if (page === "orders" && typeof renderAll === "function" && state.loaded) renderGrid();
 }
 
@@ -65,7 +67,7 @@ function renderNav() {
       if (it.group) html += '<div class="nav-group">' + escapeHtml(t(it.group)) + "</div>";
     }
     var n = it.count ? it.count() : null;
-    html += '<a class="nav-item' + (currentPageId === it.page ? " on" : "") + '" href="#/' + it.page + '"' +
+    html += '<a class="nav-item' + (currentPageId === it.page ? " on" : "") + '" data-page="' + it.page + '" href="#/' + it.page + '" title="' + escapeHtml(t(it.labelKey)) + '" aria-label="' + escapeHtml(t(it.labelKey)) + '"' +
       (currentPageId === it.page ? ' aria-current="page"' : "") + ">" + svgIcon(it.icon) +
       "<span>" + escapeHtml(t(it.labelKey)) + "</span>" +
       (n != null ? '<span class="n">' + n + "</span>" : "") + "</a>";
@@ -76,8 +78,8 @@ function renderNav() {
 
   // Bottom tab bar (phones): one tab per nav item, the quick-add "+" in the middle.
   var items = NAV_ITEMS.filter(function (it) { return it.tabKey; }).map(function (it) {
-    return '<a class="tab' + (currentPageId === it.page ? " on" : "") + '" href="#/' + it.page + '">' + svgIcon(it.icon) +
-      "<span>" + escapeHtml(t(it.tabKey)) + "</span></a>";
+    return '<a class="tab' + (currentPageId === it.page ? " on" : "") + '" href="#/' + it.page + '" title="' + escapeHtml(t(it.tabKey)) + '" aria-label="' + escapeHtml(t(it.tabKey)) + '"' +
+      (currentPageId === it.page ? ' aria-current="page"' : "") + ">" + svgIcon(it.icon) + "</a>";
   });
   var plus = '<button type="button" class="tab-plus" id="tabPlus" aria-label="' + escapeHtml(t("quickAddTitle")) + '">' + svgIcon("plus") + "</button>";
   items.splice(Math.ceil(items.length / 2), 0, plus);
@@ -98,10 +100,12 @@ function renderNavAccount() {
 }
 
 // ---- Quick add (the "+" in the tab bar and the Home buttons) ----
+function visibleQuickAdds() { return QUICK_ADDS.filter(function (q) { return !(q.hidden && q.hidden()); }); }
 function runQuickAdd() {
-  if (QUICK_ADDS.length === 1) { QUICK_ADDS[0].run(); return; }
+  var QA = visibleQuickAdds();
+  if (QA.length === 1) { QA[0].run(); return; }
   var list = document.getElementById("quickSheetList");
-  list.innerHTML = QUICK_ADDS.map(function (q, i) {
+  list.innerHTML = QA.map(function (q, i) {
     return '<button type="button" class="quick-item" data-qa="' + i + '">' + svgIcon(q.icon) + "<span>" + escapeHtml(t(q.labelKey)) + "</span></button>";
   }).join("");
   document.getElementById("quickSheetOverlay").classList.add("open");
@@ -120,7 +124,7 @@ function initRouter() {
   document.getElementById("quickSheetOverlay").addEventListener("click", function (e) {
     if (e.target === this) { closeQuickSheet(); return; }
     var b = e.target.closest("[data-qa]");
-    if (b) { closeQuickSheet(); QUICK_ADDS[parseInt(b.getAttribute("data-qa"), 10)].run(); }
+    if (b) { closeQuickSheet(); visibleQuickAdds()[parseInt(b.getAttribute("data-qa"), 10)].run(); }
   });
   document.getElementById("btnThemeQuick").addEventListener("click", function () {
     setMode(state.theme === "light" ? "dark" : "light");

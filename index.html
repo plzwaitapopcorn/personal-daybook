@@ -14,9 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,500;0,600;0,700;1,800;1,900&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=20261028a">
+<link rel="stylesheet" href="css/app.css?v=20261101c">
+<link rel="stylesheet" href="css/theme-b.css?v=20261101c">
 </head>
 <body>
 
@@ -37,6 +36,23 @@
  <symbol id="i-arrow-in" viewBox="0 0 24 24"><path d="M12 4v13M6 12l6 6 6-6"/></symbol>
  <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
  <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+ <symbol id="i-arrow-out" viewBox="0 0 24 24"><path d="M12 20V7M6 12l6-6 6 6"/></symbol>
+ <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+ <symbol id="i-all" viewBox="0 0 24 24"><path d="M12 5v14M7 9l5-4 5 4M7 15l5 4 5-4"/></symbol>
+ <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+ <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+ <symbol id="i-st-wishlist" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20Z"/></symbol>
+ <symbol id="i-st-deposit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17Z" fill="currentColor"/></symbol>
+ <symbol id="i-st-full" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="currentColor"/></symbol>
+ <symbol id="i-st-shipping" viewBox="0 0 24 24"><path d="M4 8l8-4 8 4v8l-8 4-8-4V8Z"/><path d="M4 8l8 4 8-4M12 12v8"/></symbol>
+ <symbol id="i-st-intransit" viewBox="0 0 24 24"><path d="M3 6h11v9H3zM14 9h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.6"/><circle cx="17" cy="17.5" r="1.6"/></symbol>
+ <symbol id="i-st-received" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m8.4 12.3 2.5 2.5 4.7-5"/></symbol>
+ <symbol id="i-st-cancelled" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
+ <symbol id="i-card" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></symbol>
+ <symbol id="i-bank" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5M5 10v7M9.5 10v7M14.5 10v7M19 10v7M3 20h18"/></symbol>
+ <symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M6.5 12h.01M17.5 12h.01"/></symbol>
+ <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2l3 3-3 3M3 11V9a4 4 0 0 1 4-4h13M7 22l-3-3 3-3M21 13v2a4 4 0 0 1-4 4H4"/></symbol>
+ <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.1"/></symbol>
 </defs></svg>
 
@@ -89,7 +105,6 @@
           <div class="header-actions" id="homeActions"></div>
         </div>
       </header>
-      <div class="home-tiles" id="homeTiles"></div>
       <div class="home-grid" id="homeGrid"></div>
       <div class="home-addpanel" id="homeAddPanel" hidden>
         <div class="home-addpanel-title" data-i18n="homeAddWidget">เพิ่มวิดเจ็ต</div>
@@ -103,14 +118,14 @@
   <div class="layout">
     <div class="main-col">
       <div class="chip-row" id="statusChips">
-      <button class="chip active" data-status="all"><span data-i18n="chipAll">ทั้งหมด</span><span class="chip-count" data-count="all"></span></button>
-      <button class="chip" data-status="wishlist"><span class="dot" style="color:var(--status-wishlist)"></span><span data-i18n="statusWishlist">อยากได้</span><span class="chip-count" data-count="wishlist"></span></button>
-      <button class="chip" data-status="deposit"><span class="dot" style="color:var(--status-deposit)"></span><span data-i18n="statusDeposit">มัดจำแล้ว</span><span class="chip-count" data-count="deposit"></span></button>
-      <button class="chip" data-status="full"><span class="dot" style="color:var(--status-full)"></span><span data-i18n="statusFull">จ่ายเต็มแล้ว</span><span class="chip-count" data-count="full"></span></button>
-      <button class="chip" data-status="shipping"><span class="dot" style="color:var(--status-shipping)"></span><span data-i18n="statusShipping">รอจัดส่ง</span><span class="chip-count" data-count="shipping"></span></button>
-      <button class="chip" data-status="intransit"><span class="dot" style="color:var(--status-intransit)"></span><span data-i18n="statusInTransit">กำลังจัดส่ง</span><span class="chip-count" data-count="intransit"></span></button>
-      <button class="chip" data-status="received"><span class="dot" style="color:var(--status-received)"></span><span data-i18n="statusReceived">ได้รับแล้ว</span><span class="chip-count" data-count="received"></span></button>
-      <button class="chip" data-status="cancelled"><span class="dot" style="color:var(--status-cancelled)"></span><span data-i18n="statusCancelled">ยกเลิก</span><span class="chip-count" data-count="cancelled"></span></button>
+      <button class="chip active" data-status="all" data-i18n-title="chipAll" title=""><span class="si sm all"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-list"/></svg></span><span data-i18n="chipAll">ทั้งหมด</span><span class="chip-count" data-count="all"></span></button>
+      <button class="chip" data-status="wishlist" data-i18n-title="statusWishlist" title=""><span class="si sm" style="--c:var(--status-wishlist)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-wishlist"/></svg></span><span data-i18n="statusWishlist">อยากได้</span><span class="chip-count" data-count="wishlist"></span></button>
+      <button class="chip" data-status="deposit" data-i18n-title="statusDeposit" title=""><span class="si sm" style="--c:var(--status-deposit)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-deposit"/></svg></span><span data-i18n="statusDeposit">มัดจำแล้ว</span><span class="chip-count" data-count="deposit"></span></button>
+      <button class="chip" data-status="full" data-i18n-title="statusFull" title=""><span class="si sm" style="--c:var(--status-full)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-full"/></svg></span><span data-i18n="statusFull">จ่ายเต็มแล้ว</span><span class="chip-count" data-count="full"></span></button>
+      <button class="chip" data-status="shipping" data-i18n-title="statusShipping" title=""><span class="si sm" style="--c:var(--status-shipping)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-shipping"/></svg></span><span data-i18n="statusShipping">รอจัดส่ง</span><span class="chip-count" data-count="shipping"></span></button>
+      <button class="chip" data-status="intransit" data-i18n-title="statusInTransit" title=""><span class="si sm" style="--c:var(--status-intransit)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-intransit"/></svg></span><span data-i18n="statusInTransit">กำลังจัดส่ง</span><span class="chip-count" data-count="intransit"></span></button>
+      <button class="chip" data-status="received" data-i18n-title="statusReceived" title=""><span class="si sm" style="--c:var(--status-received)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-received"/></svg></span><span data-i18n="statusReceived">ได้รับแล้ว</span><span class="chip-count" data-count="received"></span></button>
+      <button class="chip" data-status="cancelled" data-i18n-title="statusCancelled" title=""><span class="si sm" style="--c:var(--status-cancelled)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-cancelled"/></svg></span><span data-i18n="statusCancelled">ยกเลิก</span><span class="chip-count" data-count="cancelled"></span></button>
       </div>
   <div class="toolbar">
     <div class="search-box" id="searchBox">
@@ -174,14 +189,14 @@
         <div class="rail-filter">
           <div class="filter-head"><span data-i18n="filterByStatus">กรองตามสถานะ</span><button type="button" class="filter-clear" id="btnClearStatus" data-i18n="filterClear" hidden>ล้างตัวกรอง</button></div>
           <div class="filter-hint" data-i18n="filterHint">แตะที่สถานะเพื่อดูเฉพาะออเดอร์กลุ่มนั้น</div>
-        <button type="button" class="rail-row active" data-status="all"><span class="dot dot-all"></span><span class="rail-name" data-i18n="chipAll">ทั้งหมด</span><span class="count" data-count="all"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="wishlist"><span class="dot" style="color:var(--status-wishlist)"></span><span class="rail-name" data-i18n="statusWishlist">อยากได้</span><span class="count" data-count="wishlist"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="deposit"><span class="dot" style="color:var(--status-deposit)"></span><span class="rail-name" data-i18n="statusDeposit">มัดจำแล้ว</span><span class="count" data-count="deposit"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="full"><span class="dot" style="color:var(--status-full)"></span><span class="rail-name" data-i18n="statusFull">จ่ายเต็มแล้ว</span><span class="count" data-count="full"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="shipping"><span class="dot" style="color:var(--status-shipping)"></span><span class="rail-name" data-i18n="statusShipping">รอจัดส่ง</span><span class="count" data-count="shipping"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="intransit"><span class="dot" style="color:var(--status-intransit)"></span><span class="rail-name" data-i18n="statusInTransit">กำลังจัดส่ง</span><span class="count" data-count="intransit"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="received"><span class="dot" style="color:var(--status-received)"></span><span class="rail-name" data-i18n="statusReceived">ได้รับแล้ว</span><span class="count" data-count="received"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="cancelled"><span class="dot" style="color:var(--status-cancelled)"></span><span class="rail-name" data-i18n="statusCancelled">ยกเลิก</span><span class="count" data-count="cancelled"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row active" data-status="all"><span class="si sm all"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-list"/></svg></span><span class="rail-name" data-i18n="chipAll">ทั้งหมด</span><span class="count" data-count="all"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row" data-status="wishlist"><span class="si sm" style="--c:var(--status-wishlist)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-wishlist"/></svg></span><span class="rail-name" data-i18n="statusWishlist">อยากได้</span><span class="count" data-count="wishlist"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row" data-status="deposit"><span class="si sm" style="--c:var(--status-deposit)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-deposit"/></svg></span><span class="rail-name" data-i18n="statusDeposit">มัดจำแล้ว</span><span class="count" data-count="deposit"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row" data-status="full"><span class="si sm" style="--c:var(--status-full)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-full"/></svg></span><span class="rail-name" data-i18n="statusFull">จ่ายเต็มแล้ว</span><span class="count" data-count="full"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row" data-status="shipping"><span class="si sm" style="--c:var(--status-shipping)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-shipping"/></svg></span><span class="rail-name" data-i18n="statusShipping">รอจัดส่ง</span><span class="count" data-count="shipping"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row" data-status="intransit"><span class="si sm" style="--c:var(--status-intransit)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-intransit"/></svg></span><span class="rail-name" data-i18n="statusInTransit">กำลังจัดส่ง</span><span class="count" data-count="intransit"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row" data-status="received"><span class="si sm" style="--c:var(--status-received)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-received"/></svg></span><span class="rail-name" data-i18n="statusReceived">ได้รับแล้ว</span><span class="count" data-count="received"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
+        <button type="button" class="rail-row" data-status="cancelled"><span class="si sm" style="--c:var(--status-cancelled)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-cancelled"/></svg></span><span class="rail-name" data-i18n="statusCancelled">ยกเลิก</span><span class="count" data-count="cancelled"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
         </div>
       </section>
     </aside>
@@ -189,20 +204,24 @@
     </section>
 
     <!-- ===== Finance ===== -->
-    <section class="page" id="page-fin-overview" data-page="fin-overview" hidden>
-      <div class="page-title"><h2 data-i18n="navFinOverview">ภาพรวมรายเดือน</h2></div>
-      <div id="finOverviewBody"></div>
-    </section>
-    <section class="page" id="page-fin-list" data-page="fin-list" hidden>
-      <div class="page-title"><h2 data-i18n="navFinList">รายการรับ-จ่าย</h2></div>
-      <div id="finListBody"></div>
+    <section class="page" id="page-fin" data-page="fin" hidden>
+      <div class="page-title pg-head"><h2 data-i18n="navFinList">รายรับ-จ่าย</h2><div class="pg-tools" id="finTools"></div></div>
+      <div id="finBody"></div>
     </section>
     <section class="page" id="page-fin-cats" data-page="fin-cats" hidden>
-      <div class="page-title"><h2 data-i18n="navFinCats">หมวดและงบ</h2></div>
+      <div class="page-title pg-head"><h2 data-i18n="navFinCats">หมวดและงบ</h2></div>
       <div id="finCatsBody"></div>
     </section>
 
     <!-- ===== Settings ===== -->
+    <section class="page" id="page-fin-acc" data-page="fin-acc" hidden>
+      <div class="page-title pg-head"><h2 data-i18n="navFinAcc">บัญชี</h2><div class="pg-tools" id="finAccTools"></div></div>
+      <div id="finAccBody"></div>
+    </section>
+    <section class="page" id="page-fin-rec" data-page="fin-rec" hidden>
+      <div class="page-title pg-head"><h2 id="finRecTitle" data-i18n="navFinRec">รายการประจำ</h2><div class="pg-tools" id="finRecTools"></div></div>
+      <div id="finRecBody"></div>
+    </section>
     <section class="page" id="page-settings" data-page="settings" hidden>
       <div class="page-title"><h2 data-i18n="navSettings">ตั้งค่า</h2></div>
       <div class="settings-lang">
@@ -304,6 +323,7 @@
       <div class="fseg" role="group" id="txTypeSeg">
         <button type="button" class="fseg-btn" data-txtype="expense" data-i18n="finExpense">รายจ่าย</button>
         <button type="button" class="fseg-btn" data-txtype="income" data-i18n="finIncome">รายรับ</button>
+        <button type="button" class="fseg-btn" data-txtype="transfer" id="txSegTransfer" data-i18n="finTransfer">โอน</button>
       </div>
       <div class="form-row-2">
         <div class="form-row">
@@ -315,7 +335,17 @@
           <input type="date" id="fTxDate" required>
         </div>
       </div>
-      <div class="form-row">
+      <div class="form-row-2" id="txAcctRow" hidden>
+        <div class="form-row">
+          <label id="txAcctLabel" data-i18n="finAccount">บัญชี</label>
+          <select id="fTxAcct"></select>
+        </div>
+        <div class="form-row" id="txToRow" hidden>
+          <label data-i18n="finTransferTo">ไปยังบัญชี</label>
+          <select id="fTxTo"></select>
+        </div>
+      </div>
+      <div class="form-row" id="txCatRow">
         <label data-i18n="finCategory">หมวด</label>
         <div class="cat-chips" id="txCatChips"></div>
       </div>
@@ -365,6 +395,115 @@
         <button type="button" class="btn-danger-text" id="btnCatDelete" data-i18n="finCatDelete" style="display:none;">ลบหมวดนี้</button>
         <div class="footer-right">
           <button type="button" class="btn-secondary" id="cancelCatForm" data-i18n="cancelBtn">ยกเลิก</button>
+          <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Finance: account -->
+<div class="modal-overlay" id="acctModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="acctModalTitle">บัญชี</h2>
+      <button class="icon-btn" id="closeAcctModal" type="button" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form id="acctForm">
+      <div class="fseg" role="group" id="acctTypeSeg">
+        <button type="button" class="fseg-btn" data-accttype="bank" data-i18n="acctBank">ธนาคาร</button>
+        <button type="button" class="fseg-btn" data-accttype="card" data-i18n="acctCard">บัตรเครดิต</button>
+        <button type="button" class="fseg-btn" data-accttype="cash" data-i18n="acctCash">เงินสด</button>
+      </div>
+      <div class="form-row">
+        <label data-i18n="acctName">ชื่อบัญชี</label>
+        <input type="text" id="fAcctName" required data-i18n-placeholder="acctNamePh" placeholder="เช่น กสิกร">
+      </div>
+      <div class="form-row">
+        <label id="fAcctBalLabel" data-i18n="acctBalance">ยอดคงเหลือตอนนี้ (บาท)</label>
+        <input type="number" id="fAcctBal" step="0.01" inputmode="decimal" placeholder="0">
+        <div class="field-hint" id="fAcctBalHint"></div>
+      </div>
+      <div id="acctCardFields" hidden>
+        <div class="form-row">
+          <label data-i18n="acctLimit">วงเงิน (บาท)</label>
+          <input type="number" id="fAcctLimit" min="0" step="1" inputmode="decimal" placeholder="0">
+        </div>
+        <div class="form-row-2">
+          <div class="form-row">
+            <label data-i18n="acctCutoff">วันตัดรอบ (วันที่ของเดือน)</label>
+            <input type="number" id="fAcctCutoff" min="1" max="31" step="1" inputmode="numeric" placeholder="25">
+          </div>
+          <div class="form-row">
+            <label data-i18n="acctDue">วันครบกำหนดชำระ</label>
+            <input type="number" id="fAcctDue" min="1" max="31" step="1" inputmode="numeric" placeholder="10">
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="check-line"><input type="checkbox" id="fAcctMain"> <span data-i18n="acctMain">ตั้งเป็นบัญชีหลัก (รายการที่ไม่ได้เลือกบัญชีจะลงบัญชีนี้)</span></label>
+        <div class="field-hint" id="fAcctFirstHint" hidden></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-danger-text" id="btnAcctDelete" data-i18n="acctDelete" style="display:none;">ลบบัญชีนี้</button>
+        <div class="footer-right">
+          <button type="button" class="btn-secondary" id="cancelAcctForm" data-i18n="cancelBtn">ยกเลิก</button>
+          <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Finance: recurring item -->
+<div class="modal-overlay" id="recModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="recModalTitle">รายการประจำ</h2>
+      <button class="icon-btn" id="closeRecModal" type="button" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form id="recForm">
+      <div class="fseg" role="group" id="recTypeSeg">
+        <button type="button" class="fseg-btn" data-rectype="expense" data-i18n="finExpense">รายจ่าย</button>
+        <button type="button" class="fseg-btn" data-rectype="income" data-i18n="finIncome">รายรับ</button>
+      </div>
+      <div class="form-row">
+        <label data-i18n="recName">ชื่อรายการ</label>
+        <input type="text" id="fRecName" required data-i18n-placeholder="recNamePh" placeholder="เช่น ค่าเช่า">
+      </div>
+      <div class="form-row-2">
+        <div class="form-row">
+          <label data-i18n="finAmount">จำนวนเงิน (บาท)</label>
+          <input type="number" id="fRecAmount" min="0" step="0.01" inputmode="decimal" required placeholder="0">
+        </div>
+        <div class="form-row">
+          <label data-i18n="recEvery">ทุกๆ</label>
+          <select id="fRecEvery">
+            <option value="1" data-i18n="recEvery1">ทุกเดือน</option>
+            <option value="2" data-i18n="recEvery2">ทุก 2 เดือน</option>
+            <option value="3" data-i18n="recEvery3">ทุก 3 เดือน (รายไตรมาส)</option>
+            <option value="6" data-i18n="recEvery6">ทุก 6 เดือน</option>
+            <option value="12" data-i18n="recEvery12">ทุกปี</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-row">
+          <label data-i18n="recStart">เริ่มเดือน</label>
+          <input type="month" id="fRecStart" required>
+        </div>
+        <div class="form-row">
+          <label data-i18n="recCount">จำนวนงวด (ผ่อน)</label>
+          <input type="number" id="fRecCount" min="0" step="1" inputmode="numeric" data-i18n-placeholder="recCountPh" placeholder="เว้นว่างถ้าไม่มีวันจบ">
+        </div>
+      </div>
+      <div class="form-row" id="recInvestRow">
+        <label class="check-line"><input type="checkbox" id="fRecInvest"> <span data-i18n="recInvest">เป็นเงินลงทุน / เงินออม (แสดงเป็นแถวเน้นสี)</span></label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-danger-text" id="btnRecDelete" data-i18n="recDelete" style="display:none;">ลบรายการนี้</button>
+        <div class="footer-right">
+          <button type="button" class="btn-secondary" id="cancelRecForm" data-i18n="cancelBtn">ยกเลิก</button>
           <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
         </div>
       </div>
@@ -453,6 +592,11 @@
       <div class="form-row">
         <label data-i18n="labelDueDate">วันครบกำหนดจ่ายส่วนที่เหลือ (ถ้ามี)</label>
         <input type="date" id="fDueDate">
+      </div>
+
+      <div class="form-row" id="fAcctRow" hidden>
+        <label data-i18n="finPayAccount">จ่ายด้วยบัญชี</label>
+        <select id="fAcct"></select>
       </div>
 
       <div class="form-row">
@@ -665,28 +809,29 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=20261028a"></script>
-<script src="js/i18n-data.js?v=20261028a"></script>
-<script src="js/state.js?v=20261028a"></script>
-<script src="js/i18n.js?v=20261028a"></script>
-<script src="js/appearance.js?v=20261028a"></script>
-<script src="js/header.js?v=20261028a"></script>
-<script src="js/storage.js?v=20261028a"></script>
-<script src="js/utils.js?v=20261028a"></script>
-<script src="js/images.js?v=20261028a"></script>
-<script src="js/render.js?v=20261028a"></script>
-<script src="js/order-form.js?v=20261028a"></script>
-<script src="js/bulk.js?v=20261028a"></script>
-<script src="js/detail.js?v=20261028a"></script>
-<script src="js/data-io.js?v=20261028a"></script>
-<script src="js/optimize.js?v=20261028a"></script>
-<script src="js/sync.js?v=20261028a"></script>
-<script src="js/router.js?v=20261028a"></script>
-<script src="js/home.js?v=20261028a"></script>
-<script src="js/finance-data.js?v=20261028a"></script>
-<script src="js/finance-sync.js?v=20261028a"></script>
-<script src="js/finance-ui.js?v=20261028a"></script>
-<script src="js/main.js?v=20261028a"></script>
-<script src="js/pwa.js?v=20261028a"></script>
+<script src="js/config.js?v=20261101c"></script>
+<script src="js/i18n-data.js?v=20261101c"></script>
+<script src="js/state.js?v=20261101c"></script>
+<script src="js/i18n.js?v=20261101c"></script>
+<script src="js/appearance.js?v=20261101c"></script>
+<script src="js/header.js?v=20261101c"></script>
+<script src="js/storage.js?v=20261101c"></script>
+<script src="js/utils.js?v=20261101c"></script>
+<script src="js/images.js?v=20261101c"></script>
+<script src="js/render.js?v=20261101c"></script>
+<script src="js/order-form.js?v=20261101c"></script>
+<script src="js/bulk.js?v=20261101c"></script>
+<script src="js/detail.js?v=20261101c"></script>
+<script src="js/data-io.js?v=20261101c"></script>
+<script src="js/optimize.js?v=20261101c"></script>
+<script src="js/sync.js?v=20261101c"></script>
+<script src="js/router.js?v=20261101c"></script>
+<script src="js/home.js?v=20261101c"></script>
+<script src="js/finance-data.js?v=20261101c"></script>
+<script src="js/finance-sync.js?v=20261101c"></script>
+<script src="js/finance-ui.js?v=20261101c"></script>
+<script src="js/finance-acc.js?v=20261101c"></script>
+<script src="js/main.js?v=20261101c"></script>
+<script src="js/pwa.js?v=20261101c"></script>
 </body>
 </html>

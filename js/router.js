@@ -5,10 +5,13 @@
 
 var NAV_ITEMS = [
   { page: "home",         icon: "home",   labelKey: "navHome",        tabKey: "navHome",      group: "" },
-  { page: "fin",          icon: "wallet", labelKey: "navFinList",     tabKey: "navFinTab",    group: "navGroupFinance" },
-  { page: "fin-acc",      icon: "bank",   labelKey: "navFinAcc",      group: "navGroupFinance" },
-  { page: "fin-rec",      icon: "repeat", labelKey: "navFinRec",      group: "navGroupFinance" },
-  { page: "fin-cats",     icon: "tag",    labelKey: "navFinCats",     group: "navGroupFinance" },
+  // One side tab per area. Sub-pages (children) are reached with the chip row under the page title.
+  { page: "fin",          icon: "wallet", labelKey: "navGroupFinance", tabKey: "navFinTab",    group: "navGroupFinance",
+    children: ["fin-acc", "fin-rec", "fin-debt", "fin-cats"], remember: true },
+  { page: "fin-acc",      icon: "bank",   labelKey: "navFinAcc",      group: "navGroupFinance", parent: "fin" },
+  { page: "fin-rec",      icon: "repeat", labelKey: "navFinRec",      group: "navGroupFinance", parent: "fin" },
+  { page: "fin-debt",     icon: "users",  labelKey: "navFinDebt",     group: "navGroupFinance", parent: "fin" },
+  { page: "fin-cats",     icon: "tag",    labelKey: "navFinCats",     group: "navGroupFinance", parent: "fin" },
   { page: "orders",       icon: "bag",    labelKey: "navOrders",      tabKey: "navOrdersTab", group: "navGroupOrders", tileKey: "navGroupOrders",
     count: function () { return state.orders.length; },
     tileSub: function () { return t("tileOrdersSub", { n: state.orders.length }); } }
@@ -19,9 +22,12 @@ var QUICK_ADDS = [
   { id: "order", icon: "bag", labelKey: "addOrderBtn", run: function () { openOrderModal(); } }
 ];
 
-var PAGE_IDS = ["home", "fin", "fin-acc", "fin-rec", "fin-cats", "orders", "settings"];
+var PAGE_IDS = ["home", "fin", "fin-acc", "fin-rec", "fin-debt", "fin-cats", "orders", "settings"];
 var PAGE_ALIAS = { "fin-overview": "fin", "fin-list": "fin" };   // old bookmarks / links
 var currentPageId = "";
+var lastSubPage = {};     // area page -> sub-page last opened (so its tab returns there)
+function navIsOn(it) { return currentPageId === it.page || (it.children && it.children.indexOf(currentPageId) !== -1); }
+function navTarget(it) { return (it.remember && lastSubPage[it.page]) || it.page; }
 
 function pageFromHash() {
   var m = /^#\/([a-z-]+)/.exec(location.hash || "");
@@ -39,6 +45,10 @@ function showPage(page) {
   if (PAGE_IDS.indexOf(page) === -1) page = "home";
   var changed = page !== currentPageId;
   currentPageId = page;
+  NAV_ITEMS.forEach(function (it) {
+    if (it.parent && page === it.page) lastSubPage[it.parent] = page;
+    else if (it.remember && page === it.page) delete lastSubPage[it.page];
+  });
   Array.prototype.forEach.call(document.querySelectorAll(".page"), function (el) {
     el.hidden = el.getAttribute("data-page") !== page;
   });
@@ -48,7 +58,7 @@ function showPage(page) {
     if (page !== "home" && typeof homeEditOff === "function") homeEditOff();
   }
   if (page === "home" && typeof renderHome === "function") renderHome();
-  if ((page === "fin" || page === "fin-acc" || page === "fin-rec" || page === "fin-cats") && typeof finRenderPage === "function") finRenderPage(page);
+  if ((page === "fin" || page === "fin-acc" || page === "fin-rec" || page === "fin-debt" || page === "fin-cats") && typeof finRenderPage === "function") finRenderPage(page);
   if (page === "orders" && typeof renderAll === "function" && state.loaded) renderGrid();
 }
 
@@ -61,14 +71,14 @@ function renderNav() {
   var tabs = document.getElementById("tabbar");
   if (!nav || !tabs) return;
   var html = "", lastGroup = null;
-  NAV_ITEMS.forEach(function (it) {
+  NAV_ITEMS.filter(function (it) { return !it.parent; }).forEach(function (it) {
     if (it.group !== lastGroup) {
       lastGroup = it.group;
       if (it.group) html += '<div class="nav-group">' + escapeHtml(t(it.group)) + "</div>";
     }
     var n = it.count ? it.count() : null;
-    html += '<a class="nav-item' + (currentPageId === it.page ? " on" : "") + '" data-page="' + it.page + '" href="#/' + it.page + '" title="' + escapeHtml(t(it.labelKey)) + '" aria-label="' + escapeHtml(t(it.labelKey)) + '"' +
-      (currentPageId === it.page ? ' aria-current="page"' : "") + ">" + svgIcon(it.icon) +
+    html += '<a class="nav-item' + (navIsOn(it) ? " on" : "") + '" data-page="' + it.page + '" href="#/' + navTarget(it) + '" title="' + escapeHtml(t(it.labelKey)) + '" aria-label="' + escapeHtml(t(it.labelKey)) + '"' +
+      (navIsOn(it) ? ' aria-current="page"' : "") + ">" + svgIcon(it.icon) +
       "<span>" + escapeHtml(t(it.labelKey)) + "</span>" +
       (n != null ? '<span class="n">' + n + "</span>" : "") + "</a>";
   });
@@ -78,8 +88,8 @@ function renderNav() {
 
   // Bottom tab bar (phones): one tab per nav item, the quick-add "+" in the middle.
   var items = NAV_ITEMS.filter(function (it) { return it.tabKey; }).map(function (it) {
-    return '<a class="tab' + (currentPageId === it.page ? " on" : "") + '" href="#/' + it.page + '" title="' + escapeHtml(t(it.tabKey)) + '" aria-label="' + escapeHtml(t(it.tabKey)) + '"' +
-      (currentPageId === it.page ? ' aria-current="page"' : "") + ">" + svgIcon(it.icon) + "</a>";
+    return '<a class="tab' + (navIsOn(it) ? " on" : "") + '" href="#/' + navTarget(it) + '" title="' + escapeHtml(t(it.tabKey)) + '" aria-label="' + escapeHtml(t(it.tabKey)) + '"' +
+      (navIsOn(it) ? ' aria-current="page"' : "") + ">" + svgIcon(it.icon) + "</a>";
   });
   var plus = '<button type="button" class="tab-plus" id="tabPlus" aria-label="' + escapeHtml(t("quickAddTitle")) + '">' + svgIcon("plus") + "</button>";
   items.splice(Math.ceil(items.length / 2), 0, plus);

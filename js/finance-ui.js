@@ -1,7 +1,7 @@
 "use strict";
 // ---------- Finance: pages, forms, home widgets ----------
 var finView = { month: monthKeyOf(new Date()), type: "all", cat: "", acct: "" };
-var txDraft = { id: null, type: "expense", cat: "", acct: "", to: "" };
+var txDraft = { id: null, instId: "", type: "expense", cat: "", acct: "", to: "" };
 var catDraft = { id: null, type: "expense", color: CAT_COLORS[0] };
 
 function yen(n) { return "฿" + money(n); }
@@ -113,6 +113,31 @@ function fillAcctSelect(sel, value, exceptId) {
   }).join("");
   if (value) sel.value = value;
 }
+// ---- instalment block (credit-card expenses) ----
+var INST_CHOICES = [3, 4, 6, 10, 12];
+function txInstAvailable() {
+  var a = finAcctById(el("fTxAcct").value);
+  return txDraft.type === "expense" && !!a && a.type === "card" && (txDraft.instId || !txDraft.id);
+}
+function txInstOn() { return el("fTxInst").checked && txInstAvailable(); }
+function updateTxInst() {
+  var show = txInstAvailable();
+  el("txInstRow").hidden = !show;
+  el("fTxInst").disabled = !!txDraft.instId;
+  el("txInstBody").hidden = !(show && el("fTxInst").checked);
+  if (!show || !el("fTxInst").checked) return;
+  var n = Math.max(2, parseInt(el("fTxInstN").value, 10) || 2), rate = parseFloat(el("fTxInstRate").value) || 0;
+  var total = parseFloat(el("fTxAmount").value) || 0;
+  el("txInstChips").innerHTML = INST_CHOICES.map(function (c) {
+    return '<button type="button" class="chip' + (c === n ? " active" : "") + '" data-instn="' + c + '">' + c + "</button>";
+  }).join("");
+  var per = instPerMonth(total, n, rate);
+  var sum = "<b>" + escapeHtml(t("instSummary", { per: money(per), n: n, r: rate })) + "</b>";
+  var probe = { id: "probe", acct: el("fTxAcct").value, total: total, months: n, rate: rate, start: el("fTxDate").value || todayStr(), name: "", cat: "" };
+  var rows = instRows(probe);
+  if (total > 0 && rows.length) sum += "<br>" + escapeHtml(t("instFirst", { a: shortDate(rows[0].date), b: shortDate(rows[rows.length - 1].date) }));
+  el("txInstSum").innerHTML = sum;
+}
 function setTxType(type) {
   txDraft.type = type;
   Array.prototype.forEach.call(document.querySelectorAll("[data-txtype]"), function (b) {
@@ -125,30 +150,36 @@ function setTxType(type) {
   el("txToRow").hidden = !tr;
   el("txAcctLabel").textContent = t(tr ? "finTransferFrom" : "finAccount");
   if (!tr) renderTxCats();
+  updateTxInst();
 }
-// opts: { acct, to, amount, note } presets (used by "pay card")
+// opts: { acct, to, amount, note } presets (used by "pay card"). `id` may be a tx or an instalment plan.
 function openTxModal(id, type, opts) {
   opts = opts || {};
-  var x = id ? fin.items.find(function (i) { return i.id === id && i.kind === "tx"; }) : null;
+  var x = id ? fin.items.find(function (i) { return i.id === id && (i.kind === "tx" || i.kind === "inst"); }) : null;
+  var isInst = !!(x && x.kind === "inst");
   var hasAcct = finAccts().length > 0, main = finMainAcct();
   txDraft.id = x ? x.id : null;
+  txDraft.instId = isInst ? x.id : "";
   txDraft.cat = x ? x.cat : "";
-  el("txSegTransfer").style.display = finAccts().length > 1 ? "" : "none";
+  el("txSegTransfer").style.display = finAccts().length > 1 && !isInst ? "" : "none";
   el("txAcctRow").hidden = !hasAcct;
   if (hasAcct) {
     fillAcctSelect(el("fTxAcct"), x ? (x.acct || (main && main.id)) : (opts.acct || (main && main.id)));
-    fillAcctSelect(el("fTxTo"), x ? x.to : (opts.to || ""));
+    fillAcctSelect(el("fTxTo"), x && !isInst ? x.to : (opts.to || ""));
     if (!x && !opts.to) { // default destination = first account that is not the source
       var other = finAccts().filter(function (a) { return a.id !== el("fTxAcct").value; })[0];
       if (other) el("fTxTo").value = other.id;
     }
   }
-  el("fTxAmount").value = x ? x.amount : (opts.amount != null ? opts.amount : "");
-  el("fTxDate").value = x ? x.date : todayStr();
-  el("fTxNote").value = x ? (x.note || "") : (opts.note || "");
+  el("fTxAmount").value = x ? (isInst ? x.total : x.amount) : (opts.amount != null ? opts.amount : "");
+  el("fTxDate").value = x ? (isInst ? x.start : x.date) : todayStr();
+  el("fTxNote").value = x ? (isInst ? x.name : (x.note || "")) : (opts.note || "");
+  el("fTxInst").checked = isInst;
+  el("fTxInstN").value = isInst ? x.months : 10;
+  el("fTxInstRate").value = isInst && x.rate ? x.rate : "";
   el("btnTxDelete").style.display = x ? "inline-block" : "none";
-  setTxType(x ? x.type : (type || "expense"));
-  if (x) el("txModalTitle").textContent = t("finEditRecord");
+  setTxType(x ? "expense" : (type || "expense"));
+  if (x) el("txModalTitle").textContent = t(isInst ? "instEdit" : "finEditRecord");
   el("txModalOverlay").classList.add("open");
   el("fTxAmount").focus();
 }
@@ -158,13 +189,28 @@ function submitTx(e) {
   var amount = parseFloat(el("fTxAmount").value);
   if (!(amount > 0)) { el("fTxAmount").focus(); return; }
   var tr = txDraft.type === "transfer", hasAcct = finAccts().length > 0;
-  var rec = { id: txDraft.id || uid(), kind: "tx", type: txDraft.type, amount: amount, date: el("fTxDate").value || todayStr(),
+  var date = el("fTxDate").value || todayStr();
+  if (txInstOn()) {
+    var months = Math.min(60, Math.max(2, parseInt(el("fTxInstN").value, 10) || 2));
+    var plan = { id: txDraft.instId || uid(), kind: "inst", acct: el("fTxAcct").value, name: el("fTxNote").value.trim() || finCatName(finCatById(txDraft.cat)),
+      total: amount, months: months, rate: parseFloat(el("fTxInstRate").value) || 0, start: date, cat: txDraft.cat };
+    var pi = fin.items.findIndex(function (x) { return x.id === plan.id; });
+    if (pi >= 0) fin.items[pi] = plan; else fin.items.push(plan);
+    if (typeof accView !== "undefined") accView.sel = plan.acct;
+    finView.month = date.slice(0, 7);
+    finSave(); closeTxModal(); finRenderAll(); renderHome();
+    showToast(t(pi >= 0 ? "toastUpdated" : "finAdded"));
+    return;
+  }
+  var rec = { id: txDraft.id || uid(), kind: "tx", type: txDraft.type, amount: amount, date: date,
     cat: tr ? "" : txDraft.cat, note: el("fTxNote").value.trim() };
   if (hasAcct) rec.acct = el("fTxAcct").value;
   if (tr) {
     rec.to = el("fTxTo").value;
     if (!rec.to || rec.to === rec.acct) { alert(t("finTransferSame")); return; }
   }
+  var old = txDraft.id ? fin.items.find(function (x) { return x.id === txDraft.id; }) : null;
+  if (old && old.debt) rec.debt = old.debt;      // a debt settlement keeps its link when edited
   var i = fin.items.findIndex(function (x) { return x.id === rec.id; });
   if (i >= 0) fin.items[i] = rec; else fin.items.push(rec);
   finView.month = rec.date.slice(0, 7);
@@ -243,7 +289,11 @@ function finRowInfo(r) {
   var c = finCatById(r.cat), multi = finAccts().length > 1;
   var info = { title: r.note || finCatName(c), color: finCatColor(c), icon: "" };
   var sub = escapeHtml(finCatName(c));
-  if (r.type === "transfer") {
+  if (r.src === "inst") {
+    info.title = r.note;
+    sub = escapeHtml(finCatName(c)) + " · " + escapeHtml(t("instProg", { k: r.n, n: r.of }));
+    if (multi) sub += " · " + escapeHtml(acctName(finRowAcct(r)));
+  } else if (r.type === "transfer") {
     info.title = r.note || t("finTransferRow"); info.color = "var(--text-faint)";
     sub = escapeHtml(acctName(finRowAcct(r)) + " → " + acctName(r.to));
   } else if (r.src === "order") {
@@ -301,7 +351,7 @@ function vsPrevHtml(cur, prev) {
   if (pct === 0) return escapeHtml(t("finSameAsPrev"));
   return '<span class="' + (pct > 0 ? "dn" : "inc") + '">' + (pct > 0 ? "▲ " : "▼ ") + Math.abs(pct) + "%</span> " + escapeHtml(t("finVsPrev"));
 }
-function finBalanceHtml(bal) { return '<span class="' + (bal < 0 ? "dn" : "") + '">' + (bal < 0 ? "−" : "") + yen(Math.abs(bal)) + "</span>"; }
+function finBalanceHtml(bal) { return '<span class="' + (bal < 0 ? "dn" : bal > 0 ? "pos" : "") + '">' + (bal < 0 ? "−" : "") + yen(Math.abs(bal)) + "</span>"; }
 
 function renderFin() {
   var box = el("finBody"), tools = el("finTools");
@@ -347,7 +397,7 @@ function renderFin() {
       cur.rows.push(r); if (r.type !== "transfer") cur.net += (r.type === "income" ? 1 : -1) * r.amount;
     });
     groups.forEach(function (g) {
-      list += '<div class="fin-day"><span>' + escapeHtml(formatDateLong(g.date)) + "</span><span>" + (g.net < 0 ? "−" : "+") + yen(Math.abs(g.net)) + "</span></div>" +
+      list += '<div class="fin-day"><span>' + escapeHtml(formatDateLong(g.date)) + '</span><span class="' + (g.net < 0 ? "dn" : g.net > 0 ? "pos" : "") + '">' + (g.net < 0 ? "−" : "+") + yen(Math.abs(g.net)) + "</span></div>" +
         '<div class="box fin-box">' + g.rows.map(finRowHtml).join("") + "</div>";
     });
   }
@@ -356,7 +406,7 @@ function renderFin() {
   // ---- summary + side cards (right on wide screens) ----
   var sum = '<section class="box fin-sumcard">' +
     '<div class="kv"><span class="kv-l">' + svgIcon("arrow-in") + escapeHtml(t("finIncome")) + '</span><b class="inc">' + yen(tot.income) + "</b></div>" +
-    '<div class="kv"><span class="kv-l">' + svgIcon("arrow-out") + escapeHtml(t("finExpense")) + "</span><b>" + yen(tot.expense) + "</b></div>" +
+    '<div class="kv"><span class="kv-l">' + svgIcon("arrow-out") + escapeHtml(t("finExpense")) + '</span><b class="exp">' + yen(tot.expense) + "</b></div>" +
     (prev.expense > 0 ? '<div class="kv-sub">' + vsPrevHtml(tot.expense, prev.expense) + "</div>" : "") +
     '<div class="kv kv-left"><span class="kv-l">' + svgIcon("wallet") + escapeHtml(t("finLeft")) + "</span><b>" + finBalanceHtml(tot.balance) + "</b></div></section>";
   var months = [], max = 1;
@@ -393,9 +443,9 @@ function renderFinCats() {
   box.innerHTML = finSubnavHtml("fin-cats") + '<p class="fin-hint">' + escapeHtml(t("finCatsHint")) + '</p><div class="fin-catcols">' + sec("expense") + sec("income") + "</div>";
 }
 
-var FIN_PAGES = ["fin", "fin-acc", "fin-rec", "fin-cats"];
+var FIN_PAGES = ["fin", "fin-acc", "fin-rec", "fin-debt", "fin-cats"];
 function finSubnavHtml(page) {
-  var items = [["fin", "wallet", "navFinList"], ["fin-acc", "bank", "navFinAcc"], ["fin-rec", "repeat", "navFinRec"], ["fin-cats", "tag", "navFinCats"]];
+  var items = [["fin", "wallet", "navFinList"], ["fin-acc", "bank", "navFinAcc"], ["fin-rec", "repeat", "navFinRec"], ["fin-debt", "users", "navFinDebt"], ["fin-cats", "tag", "navFinCats"]];
   return '<nav class="fin-subnav" aria-label="' + escapeHtml(t("navGroupFinance")) + '">' + items.map(function (i) {
     return '<a class="chip' + (i[0] === page ? " active" : "") + '" href="#/' + i[0] + '"' + (i[0] === page ? ' aria-current="page"' : "") + ">" + svgIcon(i[1]) + "<span>" + escapeHtml(t(i[2])) + "</span></a>";
   }).join("") + "</nav>";
@@ -405,6 +455,7 @@ function finRenderPage(page) {
   else if (page === "fin-cats") renderFinCats();
   else if (page === "fin-acc") renderFinAcc();
   else if (page === "fin-rec") renderFinRec();
+  else if (page === "fin-debt") renderFinDebt();
 }
 function finRenderAll() {
   if (FIN_PAGES.indexOf(currentPageId) !== -1) finRenderPage(currentPageId);
@@ -456,9 +507,12 @@ function initFinance() {
   el("txModalOverlay").addEventListener("click", function (e) { if (e.target === this) closeTxModal(); });
   el("txForm").addEventListener("submit", submitTx);
   el("txTypeSeg").addEventListener("click", function (e) { var b = e.target.closest("[data-txtype]"); if (b) setTxType(b.getAttribute("data-txtype")); });
+  el("fTxInst").addEventListener("change", updateTxInst);
+  ["fTxAcct", "fTxAmount", "fTxDate", "fTxInstN", "fTxInstRate"].forEach(function (id) { el(id).addEventListener("input", updateTxInst); el(id).addEventListener("change", updateTxInst); });
+  el("txInstChips").addEventListener("click", function (e) { var b = e.target.closest("[data-instn]"); if (b) { el("fTxInstN").value = b.getAttribute("data-instn"); updateTxInst(); } });
   el("txCatChips").addEventListener("click", function (e) { var b = e.target.closest("[data-catpick]"); if (b) { txDraft.cat = b.getAttribute("data-catpick"); renderTxCats(); } });
   el("btnTxDelete").addEventListener("click", function () {
-    if (!txDraft.id || !confirm(t("finDeleteConfirm"))) return;
+    if (!txDraft.id || !confirm(t(txDraft.instId ? "instDeleteConfirm" : "finDeleteConfirm"))) return;
     fin.items = fin.items.filter(function (x) { return x.id !== txDraft.id; });
     finSave(); closeTxModal(); finRenderAll();
   });
@@ -479,11 +533,11 @@ function initFinance() {
     if (cb) cb(v);
   });
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") { closeTxModal(); closeCatModal(); closePayDialog(); if (typeof closeAcctModal === "function") { closeAcctModal(); closeRecModal(); } }
+    if (e.key === "Escape") { closeTxModal(); closeCatModal(); closePayDialog(); if (typeof closeAcctModal === "function") { closeAcctModal(); closeRecModal(); closeDebtModal(); closeDebtPay(); } }
   });
 
   // pages (event delegation on the three containers)
-  ["finBody", "finTools", "finCatsBody", "finAccBody", "finAccTools", "finRecBody", "finRecTools"].forEach(function (id) {
+  ["finBody", "finTools", "finCatsBody", "finAccBody", "finAccTools", "finRecBody", "finRecTools", "finDebtBody", "finDebtTools"].forEach(function (id) {
     el(id).addEventListener("click", function (e) {
       var b;
       if ((b = e.target.closest("[data-fm]"))) {
@@ -517,5 +571,6 @@ function initFinance() {
 }
 function openFinRow(b) {
   if (b.getAttribute("data-src") === "order") openDetailModal(b.getAttribute("data-order"));
+  else if (b.getAttribute("data-src") === "inst") openTxModal(b.getAttribute("data-id").split(":")[0], "expense");
   else openTxModal(b.getAttribute("data-id"));
 }

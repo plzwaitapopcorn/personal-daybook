@@ -14,8 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="css/app.css?v=20261101c">
-<link rel="stylesheet" href="css/theme-b.css?v=20261101c">
+<link rel="stylesheet" href="css/app.css?v=20261101e">
+<link rel="stylesheet" href="css/theme-b.css?v=20261101e">
 </head>
 <body>
 
@@ -53,6 +53,7 @@
  <symbol id="i-cash" viewBox="0 0 24 24"><rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M6.5 12h.01M17.5 12h.01"/></symbol>
  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2l3 3-3 3M3 11V9a4 4 0 0 1 4-4h13M7 22l-3-3 3-3M21 13v2a4 4 0 0 1-4 4H4"/></symbol>
  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
+ <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14.5c1.7.8 3 2.7 3 5.5"/></symbol>
  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.1"/></symbol>
 </defs></svg>
 
@@ -222,6 +223,10 @@
       <div class="page-title pg-head"><h2 id="finRecTitle" data-i18n="navFinRec">รายการประจำ</h2><div class="pg-tools" id="finRecTools"></div></div>
       <div id="finRecBody"></div>
     </section>
+    <section class="page" id="page-fin-debt" data-page="fin-debt" hidden>
+      <div class="page-title pg-head"><h2 data-i18n="navFinDebt">ค้างจ่าย</h2><div class="pg-tools" id="finDebtTools"></div></div>
+      <div id="finDebtBody"></div>
+    </section>
     <section class="page" id="page-settings" data-page="settings" hidden>
       <div class="page-title"><h2 data-i18n="navSettings">ตั้งค่า</h2></div>
       <div class="settings-lang">
@@ -343,6 +348,25 @@
         <div class="form-row" id="txToRow" hidden>
           <label data-i18n="finTransferTo">ไปยังบัญชี</label>
           <select id="fTxTo"></select>
+        </div>
+      </div>
+      <div class="form-row" id="txInstRow" hidden>
+        <div class="inst-box">
+          <label class="inst-top"><span data-i18n="instToggle">ผ่อนชำระเป็นงวด</span><input type="checkbox" id="fTxInst" class="switch"></label>
+          <div id="txInstBody" hidden>
+            <div class="inst-chips" id="txInstChips"></div>
+            <div class="form-row-2">
+              <div class="form-row">
+                <label data-i18n="instMonths">จำนวนงวด (เดือน)</label>
+                <input type="number" id="fTxInstN" min="2" max="60" step="1" inputmode="numeric" value="10">
+              </div>
+              <div class="form-row">
+                <label data-i18n="instRate">ดอกเบี้ย % ต่อเดือน (ถ้ามี)</label>
+                <input type="number" id="fTxInstRate" min="0" step="0.01" inputmode="decimal" placeholder="0">
+              </div>
+            </div>
+            <div class="inst-sum" id="txInstSum"></div>
+          </div>
         </div>
       </div>
       <div class="form-row" id="txCatRow">
@@ -504,6 +528,89 @@
         <button type="button" class="btn-danger-text" id="btnRecDelete" data-i18n="recDelete" style="display:none;">ลบรายการนี้</button>
         <div class="footer-right">
           <button type="button" class="btn-secondary" id="cancelRecForm" data-i18n="cancelBtn">ยกเลิก</button>
+          <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Finance: debt (owed to / by a friend) -->
+<div class="modal-overlay" id="debtModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="debtModalTitle">ค้างจ่าย</h2>
+      <button class="icon-btn" id="closeDebtModal" type="button" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form id="debtForm">
+      <div class="fseg" role="group" id="debtDirSeg">
+        <button type="button" class="fseg-btn" data-debtdir="owe" data-i18n="debtOwe">ฉันค้างเขา</button>
+        <button type="button" class="fseg-btn" data-debtdir="owed" data-i18n="debtOwed">เขาค้างฉัน</button>
+      </div>
+      <div class="form-row-2">
+        <div class="form-row">
+          <label data-i18n="debtWho">ชื่อคน</label>
+          <input type="text" id="fDebtWho" list="debtWhoList" required data-i18n-placeholder="debtWhoPh" placeholder="เช่น ฟ้า">
+          <datalist id="debtWhoList"></datalist>
+        </div>
+        <div class="form-row">
+          <label data-i18n="finDate">วันที่</label>
+          <input type="date" id="fDebtDate" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <label data-i18n="debtWhat">ของอะไร / เรื่องอะไร</label>
+        <input type="text" id="fDebtName" required data-i18n-placeholder="debtWhatPh" placeholder="เช่น ฝากซื้อโปสเตอร์">
+      </div>
+      <div class="form-row">
+        <label data-i18n="finAmount">จำนวนเงิน (บาท)</label>
+        <input type="number" id="fDebtAmount" min="0" step="0.01" inputmode="decimal" required placeholder="0">
+      </div>
+      <div class="form-row">
+        <label data-i18n="finCategory">หมวด</label>
+        <div class="cat-chips" id="debtCatChips"></div>
+      </div>
+      <div class="form-row" id="debtRecordRow" hidden>
+        <label class="check-line"><input type="checkbox" id="fDebtRecord" checked> <span data-i18n="debtRecord">บันทึกที่เราจ่ายไปเป็นรายจ่ายตอนนี้ด้วย</span></label>
+        <div class="field-hint" data-i18n="debtRecordHint">ถ้าจดรายจ่ายนี้ไว้แล้ว ให้ติ๊กออก</div>
+        <select id="fDebtAcct" style="margin-top:8px"></select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-danger-text" id="btnDebtDelete" data-i18n="debtDelete" style="display:none;">ลบรายการนี้</button>
+        <div class="footer-right">
+          <button type="button" class="btn-secondary" id="cancelDebtForm" data-i18n="cancelBtn">ยกเลิก</button>
+          <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Finance: settle a debt -->
+<div class="modal-overlay" id="debtPayOverlay">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 id="debtPayTitle"></h2>
+      <button class="icon-btn" id="closeDebtPay" type="button" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form id="debtPayForm">
+      <div class="dlg-sum" id="debtPaySum"></div>
+      <div class="form-row">
+        <label data-i18n="finAmount">จำนวนเงิน (บาท)</label>
+        <input type="number" id="fDebtPayAmount" min="0" step="0.01" inputmode="decimal" required>
+      </div>
+      <div class="form-row" id="debtPayAcctRow">
+        <label id="debtPayAcctLabel" data-i18n="debtPayFrom">จ่ายจากบัญชี</label>
+        <select id="fDebtPayAcct"></select>
+      </div>
+      <div class="form-row">
+        <label data-i18n="finDate">วันที่</label>
+        <input type="date" id="fDebtPayDate" required>
+      </div>
+      <div class="modal-footer">
+        <span></span>
+        <div class="footer-right">
+          <button type="button" class="btn-secondary" id="cancelDebtPay" data-i18n="cancelBtn">ยกเลิก</button>
           <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
         </div>
       </div>
@@ -809,29 +916,29 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=20261101c"></script>
-<script src="js/i18n-data.js?v=20261101c"></script>
-<script src="js/state.js?v=20261101c"></script>
-<script src="js/i18n.js?v=20261101c"></script>
-<script src="js/appearance.js?v=20261101c"></script>
-<script src="js/header.js?v=20261101c"></script>
-<script src="js/storage.js?v=20261101c"></script>
-<script src="js/utils.js?v=20261101c"></script>
-<script src="js/images.js?v=20261101c"></script>
-<script src="js/render.js?v=20261101c"></script>
-<script src="js/order-form.js?v=20261101c"></script>
-<script src="js/bulk.js?v=20261101c"></script>
-<script src="js/detail.js?v=20261101c"></script>
-<script src="js/data-io.js?v=20261101c"></script>
-<script src="js/optimize.js?v=20261101c"></script>
-<script src="js/sync.js?v=20261101c"></script>
-<script src="js/router.js?v=20261101c"></script>
-<script src="js/home.js?v=20261101c"></script>
-<script src="js/finance-data.js?v=20261101c"></script>
-<script src="js/finance-sync.js?v=20261101c"></script>
-<script src="js/finance-ui.js?v=20261101c"></script>
-<script src="js/finance-acc.js?v=20261101c"></script>
-<script src="js/main.js?v=20261101c"></script>
-<script src="js/pwa.js?v=20261101c"></script>
+<script src="js/config.js?v=20261101e"></script>
+<script src="js/i18n-data.js?v=20261101e"></script>
+<script src="js/state.js?v=20261101e"></script>
+<script src="js/i18n.js?v=20261101e"></script>
+<script src="js/appearance.js?v=20261101e"></script>
+<script src="js/header.js?v=20261101e"></script>
+<script src="js/storage.js?v=20261101e"></script>
+<script src="js/utils.js?v=20261101e"></script>
+<script src="js/images.js?v=20261101e"></script>
+<script src="js/render.js?v=20261101e"></script>
+<script src="js/order-form.js?v=20261101e"></script>
+<script src="js/bulk.js?v=20261101e"></script>
+<script src="js/detail.js?v=20261101e"></script>
+<script src="js/data-io.js?v=20261101e"></script>
+<script src="js/optimize.js?v=20261101e"></script>
+<script src="js/sync.js?v=20261101e"></script>
+<script src="js/router.js?v=20261101e"></script>
+<script src="js/home.js?v=20261101e"></script>
+<script src="js/finance-data.js?v=20261101e"></script>
+<script src="js/finance-sync.js?v=20261101e"></script>
+<script src="js/finance-ui.js?v=20261101e"></script>
+<script src="js/finance-acc.js?v=20261101e"></script>
+<script src="js/main.js?v=20261101e"></script>
+<script src="js/pwa.js?v=20261101e"></script>
 </body>
 </html>

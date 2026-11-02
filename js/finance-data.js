@@ -53,7 +53,7 @@ function finInitMaps() {
 function readFinLS() {
   try { var a = JSON.parse(localStorage.getItem(FIN_LS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
 }
-function finValid(x) { return x && typeof x.id === "string" && (x.kind === "tx" || x.kind === "cat" || x.kind === "acct" || x.kind === "rec"); }
+function finValid(x) { return x && typeof x.id === "string" && (x.kind === "tx" || x.kind === "cat" || x.kind === "acct" || x.kind === "rec" || x.kind === "inst" || x.kind === "debt"); }
 
 function finSeedDefaults() {
   var seeded = false;
@@ -192,7 +192,7 @@ function finAcctBalance(a) { return (Number(a.opening) || 0) + finAcctNet(a.id);
 // Cards: money owed (positive). Others: 0.
 function finCardOwed(a) { return Math.max(0, -finAcctBalance(a)); }
 // Net worth = everything held minus everything owed on cards.
-function finNetWorth() { return finAccts().reduce(function (s, a) { return s + finAcctBalance(a); }, 0); }
+function finNetWorth() { return finAccts().reduce(function (s, a) { return s + finAcctBalance(a); }, 0) - finDebtTotal("owe") + finDebtTotal("owed"); }
 function finDateStr(y, m, d) { return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(Math.min(d, new Date(y, m + 1, 0).getDate())).padStart(2, "0"); }
 // Next occurrence (today or later) of day-of-month `day`, as YYYY-MM-DD.
 function nextDayOfMonth(day, from) {
@@ -240,6 +240,40 @@ function recTotals(key) {
   return { income: inc, expense: exp, invest: inv, left: inc - exp - inv };
 }
 
+// ---- card instalments ----
+// inst: { kind:"inst", acct (card), name, total, months, rate (% per month, flat), start (purchase date), cat, note }
+// Each instalment is a real expense on the card dated on the statement it lands in; future ones are not counted yet.
+function finInsts(acctId) { return fin.items.filter(function (x) { return x.kind === "inst" && (!acctId || finRowAcct({ acct: x.acct }) === acctId); }); }
+function instPerMonth(total, months, rate) {
+  var n = Math.max(1, months | 0), r = Number(rate) || 0;
+  return Math.round((total / n + total * r / 100) * 100) / 100;
+}
+function instRows(it) {
+  var a = finAcctById(it.acct), cut = a && parseInt(a.cutoff, 10) ? parseInt(a.cutoff, 10) : parseInt((it.start || todayStr()).slice(8, 10), 10);
+  var first = nextDayOfMonth(cut, it.start || todayStr()), p = first.split("-"), y = +p[0], m = +p[1] - 1;
+  var per = instPerMonth(Number(it.total) || 0, it.months, it.rate), rows = [];
+  for (var i = 0; i < (it.months | 0); i++) {
+    var mm = m + i, yy = y + Math.floor(mm / 12);
+    rows.push({ src: "inst", id: it.id + ":" + i, instId: it.id, type: "expense", amount: per, date: finDateStr(yy, ((mm % 12) + 12) % 12, cut),
+      cat: it.cat, note: it.name, acct: it.acct || "", to: "", debt: "", n: i + 1, of: it.months | 0 });
+  }
+  return rows;
+}
+// { per, paid (count billed so far), left (amount still to be billed), rows }
+function instStatus(it) {
+  var today = todayStr(), rows = instRows(it), paid = 0, left = 0;
+  rows.forEach(function (r) { if (r.date <= today) paid++; else left += r.amount; });
+  return { per: instPerMonth(Number(it.total) || 0, it.months, it.rate), paid: paid, left: left, rows: rows, done: paid >= rows.length, end: rows.length ? rows[rows.length - 1].date : "" };
+}
+function finInstLeft(acctId) { return finInsts(acctId).reduce(function (s, it) { return s + instStatus(it).left; }, 0); }
+
+// ---- debts (money owed to / by friends; nothing is expense or income until it is settled) ----
+// debt: { kind:"debt", dir:"owe"|"owed", who, name, amount, date, cat, note }; settlements are tx records with tx.debt = debt.id
+function finDebts(dir) { return fin.items.filter(function (x) { return x.kind === "debt" && (!dir || x.dir === dir); }); }
+function finDebtPaid(d) { return finTxs().reduce(function (s, x) { return s + (x.debt === d.id ? Number(x.amount) || 0 : 0); }, 0); }
+function finDebtLeft(d) { return Math.max(0, (Number(d.amount) || 0) - finDebtPaid(d)); }
+function finDebtTotal(dir) { return finDebts(dir).reduce(function (s, d) { return s + finDebtLeft(d); }, 0); }
+
 function finTxs() { return fin.items.filter(function (x) { return x.kind === "tx"; }); }
 function finCatById(id) {
   for (var i = 0; i < fin.items.length; i++) if (fin.items[i].kind === "cat" && fin.items[i].id === id) return fin.items[i];
@@ -283,7 +317,11 @@ function orderPaidTotal(o) {
 function finAllRows() {
   var rows = [];
   finTxs().forEach(function (x) {
-    rows.push({ src: "tx", id: x.id, type: x.type, amount: Number(x.amount) || 0, date: x.date || "", cat: x.cat, note: x.note || "", acct: x.acct || "", to: x.to || "" });
+    rows.push({ src: "tx", id: x.id, type: x.type, amount: Number(x.amount) || 0, date: x.date || "", cat: x.cat, note: x.note || "", acct: x.acct || "", to: x.to || "", debt: x.debt || "" });
+  });
+  finInsts().forEach(function (it) {
+    var today = todayStr();
+    instRows(it).forEach(function (r) { if (r.date <= today) rows.push(r); });
   });
   state.orders.forEach(function (o) { orderPayments(o).forEach(function (r) { rows.push(r); }); });
   return rows;

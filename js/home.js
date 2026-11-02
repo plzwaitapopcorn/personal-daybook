@@ -6,7 +6,7 @@
 
 var HOME_KEY = "preorderVault_home";
 var homePrefs = { order: [], hidden: [] };
-var HOME_DEFAULT_HIDDEN = ["stat-received", "stat-spent", "fin-acc"];   // first run only: keeps the top strip to four numbers
+var HOME_DEFAULT_HIDDEN = ["stat-received", "stat-spent", "fin-acc", "fin-debt"];   // first run only: keeps the top strip to four numbers
 var homeEdit = false;
 
 (function loadHomePrefs() {

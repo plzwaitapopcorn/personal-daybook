@@ -22,12 +22,15 @@ function acctCardHtml(a) {
       var dd = nextDayOfMonth(parseInt(a.due, 10)), left = daysUntil(dd);
       badge = '<span class="stamp' + (left > 7 ? " calm" : "") + '">' + escapeHtml(left === 0 ? t("acctDueToday") : t("acctDueOn", { date: shortDate(dd) })) + "</span>";
     }
-    var used = lim > 0 ? Math.min(100, owed / lim * 100) : 0;
-    foot = '<div class="acc-foot"><div class="acc-l"><small>' + escapeHtml(t("acctOwedLbl")) + '</small><span class="acc-num">' + yen(owed) + "</span></div>" +
-      '<div class="acc-r">' + (lim > 0 ? escapeHtml(t("acctLimitLine", { n: money(lim) })) + "<br>" : "") + (a.cutoff ? escapeHtml(t("acctCutLine", { d: a.cutoff })) : "") + "</div></div>" +
+    var ins = finInsts(a.id).filter(function (it) { return !instStatus(it).done; }), insLeft = finInstLeft(a.id);
+    var used = lim > 0 ? Math.min(100, (owed + insLeft) / lim * 100) : 0;
+    var info = ins.length ? escapeHtml(t("instCardLine", { c: ins.length, n: money(insLeft) })) + "<br>" + (lim > 0 ? escapeHtml(t("instLimitUsed", { u: money(owed + insLeft), l: money(lim) })) : "")
+      : (lim > 0 ? escapeHtml(t("acctLimitLine", { n: money(lim) })) + "<br>" : "") + (a.cutoff ? escapeHtml(t("acctCutLine", { d: a.cutoff })) : "");
+    foot = '<div class="acc-foot' + (ins.length ? " stack" : "") + '"><div class="acc-l"><small>' + escapeHtml(t("acctOwedLbl")) + '</small><span class="acc-num">' + yen(owed) + "</span></div>" +
+      '<div class="acc-r">' + info + "</div></div>" +
       (lim > 0 ? '<div class="acc-bar"><i style="width:' + used + '%"></i></div>' : "");
   } else {
-    foot = '<div class="acc-foot"><div class="acc-l"><small>' + escapeHtml(t("acctBalanceLbl")) + '</small><span class="acc-num' + (bal < 0 ? " neg" : "") + '">' + (bal < 0 ? "−" : "") + yen(Math.abs(bal)) + "</span></div></div>";
+    foot = '<div class="acc-foot"><div class="acc-l"><small>' + escapeHtml(t("acctBalanceLbl")) + '</small><span class="acc-num ' + (bal < 0 ? "neg" : bal > 0 ? "pos" : "") + '">' + (bal < 0 ? "−" : "") + yen(Math.abs(bal)) + "</span></div></div>";
   }
   if (!badge && main && finAccts().length > 1) badge = '<span class="acc-main">' + escapeHtml(t("acctMainBadge")) + "</span>";
   return '<div class="acc-card t-' + a.type + (accView.sel === a.id ? " sel" : "") + '" data-accsel="' + a.id + '" role="button" tabindex="0">' +
@@ -41,7 +44,7 @@ function acctMovesHtml(a) {
     var cyc = finCardCycle(a);
     if (cyc) sub = '<span class="acc-cycle">' + escapeHtml(t("acctCycle", { a: shortDate(cyc.from), b: shortDate(cyc.to) })) + "</span>";
   }
-  return '<section class="acc-moves"><div class="acc-moves-h"><h4 class="fin-h">' + svgIcon(ACCT_ICON[a.type] || "bank") + escapeHtml(t("acctMoves", { name: a.name })) + "</h4>" + sub + "</div>" +
+  return instListHtml(a) + '<section class="acc-moves"><div class="acc-moves-h"><h4 class="fin-h">' + svgIcon(ACCT_ICON[a.type] || "bank") + escapeHtml(t("acctMoves", { name: a.name })) + "</h4>" + sub + "</div>" +
     (rows.length ? '<div class="box fin-box">' + rows.map(finRowHtml).join("") + "</div>" : '<div class="hempty wide">' + escapeHtml(t("acctNoMoves")) + "</div>") +
     '<p class="fin-hint">' + escapeHtml(t("acctTransferNote")) + "</p></section>";
 }
@@ -57,6 +60,17 @@ function renderFinAcc() {
     return;
   }
   if (!finAcctById(accView.sel)) accView.sel = (finMainAcct() || accts[0]).id;
+  var owedAll = accts.reduce(function (s, a) { return s + (a.type === "card" ? finCardOwed(a) : 0); }, 0), nw = finNetWorth();
+  var dOwe = finDebtTotal("owe"), dOwed = finDebtTotal("owed"), hold = nw + owedAll + dOwe - dOwed;
+  var terms = [];
+  if (owedAll > 0 || dOwe > 0 || dOwed > 0) {
+    terms.push('<div><small>' + escapeHtml(t("acctHeld")) + "</small><span" + (hold < 0 ? ' class="neg"' : "") + ">" + (hold < 0 ? "−" : "") + yen(Math.abs(hold)) + "</span></div>");
+    if (owedAll > 0) terms.push("<i>−</i><div><small>" + escapeHtml(t("acctOwedCards")) + '</small><span class="neg">' + yen(owedAll) + "</span></div>");
+    if (dOwe > 0) terms.push("<i>−</i><div><small>" + escapeHtml(t("acctOwedFriends")) + '</small><span class="neg">' + yen(dOwe) + "</span></div>");
+    if (dOwed > 0) terms.push("<i>+</i><div><small>" + escapeHtml(t("acctFriendsOwe")) + '</small><span class="pos">' + yen(dOwed) + "</span></div>");
+  }
+  html += '<section class="nw-strip"><div class="nw-main"><small>' + escapeHtml(t("acctNet")) + '</small><b class="' + (nw < 0 ? "neg" : "pos") + '">' + (nw < 0 ? "−" : "") + yen(Math.abs(nw)) + "</b></div>" +
+    (terms.length ? '<div class="nw-eq">' + terms.join("") + "</div>" : "") + "</section>";
   html += '<div class="acc-grid">' + accts.map(acctCardHtml).join("") + "</div>";
   var acts = "";
   if (accts.length > 1) acts += '<button type="button" class="btn-primary dark" data-finadd="transfer">' + svgIcon("swap") + "<span>" + escapeHtml(t("finAddTransfer")) + "</span></button>";
@@ -64,8 +78,7 @@ function renderFinAcc() {
     if (a.type === "card" && finCardOwed(a) > 0 && accts.length > 1)
       acts += '<button type="button" class="btn-ghost-sm card-pay" data-paycard="' + a.id + '">' + svgIcon("card") + "<span>" + escapeHtml(t("acctPayCard", { name: a.name })) + "</span></button>";
   });
-  var nw = finNetWorth();
-  html += '<div class="acc-actions">' + acts + '<span class="sp"></span><span class="acc-net">' + escapeHtml(t("acctNet")) + " <b>" + (nw < 0 ? "−" : "") + yen(Math.abs(nw)) + "</b></span></div>";
+  html += '<div class="acc-actions">' + acts + "</div>";
   html += acctMovesHtml(finAcctById(accView.sel));
   box.innerHTML = html;
 }
@@ -150,6 +163,174 @@ function payCard(id) {
   openTxModal(null, "transfer", { acct: from ? from.id : "", to: a.id, amount: finCardOwed(a), note: t("acctPayCard", { name: a.name }) });
 }
 
+// ---- instalment plans of a card ----
+function instListHtml(a) {
+  if (a.type !== "card") return "";
+  var list = finInsts(a.id);
+  if (!list.length) return "";
+  list.sort(function (x, y) { return instStatus(x).done - instStatus(y).done; });
+  return '<section class="inst-list"><h4 class="fin-h">' + svgIcon("repeat") + escapeHtml(t("instSection", { name: a.name })) + '</h4><div class="box fin-box">' + list.map(function (it) {
+    var st = instStatus(it), n = it.months | 0, pct = Math.round(st.paid / n * 100);
+    return '<button type="button" class="inst-row' + (st.done ? " done" : "") + '" data-instedit="' + it.id + '"><div class="inst-main"><b>' + escapeHtml(it.name) + "</b><small>" +
+      escapeHtml(t("instRowSub", { total: money(it.total), r: Number(it.rate) || 0, n: n })) + '</small></div><div class="inst-mid"><div class="inst-prog"><span>' + escapeHtml(t("instProg", { k: st.paid, n: n })) +
+      "</span><span>" + escapeHtml(st.done ? t("instDone") : t("instEnds", { m: monthLabelOf(st.end.slice(0, 7), true) + " " + yearLabel(parseInt(st.end.slice(0, 4), 10)) })) + '</span></div><div class="inst-bar"><i style="width:' + pct + '%"></i></div></div>' +
+      '<div class="inst-amt">' + yen(st.per) + "<small> " + escapeHtml(t("instPerMonth")) + "</small>" + (st.done ? "" : "<small>" + escapeHtml(t("instLeft", { n: money(st.left) })) + "</small>") + "</div></button>";
+  }).join("") + '</div><p class="fin-hint">' + escapeHtml(t("instNote")) + "</p></section>";
+}
+
+// ================= debts (IOUs) =================
+var debtDraft = { id: null, dir: "owe", cat: "" };
+var debtView = { dir: "owe" };
+var debtPay = { ids: [], dir: "owe", who: "" };
+var DEBT_LONG_DAYS = 30;
+var AVATAR_COLORS = ["#e08a6a", "#6a9ae0", "#7bb98a", "#b58ad6", "#d6a64a", "#5fb5b0", "#d67a9a"];
+function avatarColor(name) { var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0; return AVATAR_COLORS[h % AVATAR_COLORS.length]; }
+function debtAge(d) { return Math.max(0, -daysUntil(d.date)); }
+function debtGroups(dir) {
+  var map = {}, order = [];
+  finDebts(dir).forEach(function (d) {
+    if (finDebtLeft(d) <= 0) return;
+    var k = d.who.trim().toLowerCase();
+    if (!map[k]) { map[k] = { who: d.who.trim(), items: [], total: 0 }; order.push(k); }
+    map[k].items.push(d); map[k].total += finDebtLeft(d);
+  });
+  return order.map(function (k) { map[k].items.sort(function (a, b) { return a.date < b.date ? -1 : 1; }); return map[k]; })
+    .sort(function (a, b) { return b.total - a.total; });
+}
+function debtRowHtml(d, dir) {
+  var left = finDebtLeft(d), age = debtAge(d), part = left < (Number(d.amount) || 0);
+  return '<div class="iou-r" data-debtedit="' + d.id + '" tabindex="0"><span class="d">' + escapeHtml(shortDate(d.date)) + '</span><div class="t"><b>' + escapeHtml(d.name) + "</b><small>" +
+    escapeHtml(part ? t("debtLeftOf", { a: money(left), b: money(d.amount) }) : (age > 0 ? t("debtAge", { n: age }) : t("debtToday"))) + "</small></div>" +
+    (age > DEBT_LONG_DAYS ? '<span class="stamp">' + escapeHtml(t("debtLong")) + "</span>" : "") +
+    '<span class="a ' + (dir === "owe" ? "neg" : "pos") + '">' + yen(left) + '</span><button type="button" class="iou-pay" data-debtpay="' + d.id + '">' + escapeHtml(t(dir === "owe" ? "debtPayBtn" : "debtRecvBtn")) + "</button></div>";
+}
+function renderFinDebt() {
+  var box = el("finDebtBody"), tools = el("finDebtTools");
+  if (!fin.loaded) { box.innerHTML = ""; tools.innerHTML = ""; return; }
+  tools.innerHTML = '<div class="fin-addbtns"><button type="button" class="btn-primary" data-debtnew="1">' + svgIcon("plus") + "<span>" + escapeHtml(t("debtNew")) + "</span></button></div>";
+  var dir = debtView.dir, groups = debtGroups(dir), total = groups.reduce(function (s, g) { return s + g.total; }, 0);
+  var items = groups.reduce(function (s, g) { return s + g.items.length; }, 0);
+  function cnt(d) { return debtGroups(d).reduce(function (s, g) { return s + g.items.length; }, 0); }
+  var html = finSubnavHtml("fin-debt") + '<div class="debt-seg"><button type="button" class="chip' + (dir === "owe" ? " active" : "") + '" data-debtdir-view="owe">' + escapeHtml(t("debtOwe")) + " <span class=\"chip-count\">" + cnt("owe") + '</span></button>' +
+    '<button type="button" class="chip' + (dir === "owed" ? " active" : "") + '" data-debtdir-view="owed">' + escapeHtml(t("debtOwed")) + " <span class=\"chip-count\">" + cnt("owed") + "</span></button></div>";
+  html += '<section class="nw-strip"><div class="nw-main"><small>' + escapeHtml(t(dir === "owe" ? "debtTotalOwe" : "debtTotalOwed")) + '</small><b class="' + (dir === "owe" ? "neg" : "pos") + '">' + yen(total) + '</b></div>' +
+    '<div class="nw-eq"><div><small>' + escapeHtml(t("debtItems")) + '</small><span style="color:var(--text)">' + items + "</span></div><i>·</i><div><small>" + escapeHtml(t("debtPeople")) + '</small><span style="color:var(--text)">' + groups.length + "</span></div></div></section>";
+  if (!groups.length) html += '<div class="acc-empty box"><p>' + escapeHtml(t(dir === "owe" ? "debtEmptyOwe" : "debtEmptyOwed")) + '</p><button type="button" class="btn-primary" data-debtnew="1">' + svgIcon("plus") + "<span>" + escapeHtml(t("debtNew")) + "</span></button></div>";
+  groups.forEach(function (g) {
+    var oldest = g.items.reduce(function (m, d) { return Math.max(m, debtAge(d)); }, 0);
+    html += '<section class="iou-who"><div class="iou-h"><span class="av" style="background:' + avatarColor(g.who) + '">' + escapeHtml(g.who.charAt(0).toUpperCase()) + "</span><div><b>" + escapeHtml(g.who) + "</b><small>" +
+      escapeHtml(t("debtOldest", { n: oldest })) + '</small></div><span class="tot ' + (dir === "owe" ? "neg" : "pos") + '">' + yen(g.total) + "</span></div>" + g.items.map(function (d) { return debtRowHtml(d, dir); }).join("") +
+      (g.items.length > 1 ? '<div class="iou-all"><button type="button" class="iou-pay dark" data-debtpayall="' + escapeHtml(g.who) + '">' + escapeHtml(t(dir === "owe" ? "debtPayAll" : "debtRecvAll", { who: g.who, n: money(g.total) })) + "</button></div>" : "") + "</section>";
+  });
+  html += '<p class="fin-hint">' + escapeHtml(t(dir === "owe" ? "debtNoteOwe" : "debtNoteOwed")) + "</p>";
+  var settled = finDebts(dir).filter(function (d) { return finDebtLeft(d) <= 0; });
+  if (settled.length) html += '<details class="iou-done"><summary>' + escapeHtml(t("debtSettled", { n: settled.length })) + '</summary><div class="box fin-box">' + settled.sort(function (a, b) { return a.date < b.date ? 1 : -1; }).map(function (d) {
+    return '<div class="iou-r" data-debtedit="' + d.id + '" tabindex="0"><span class="d">' + escapeHtml(shortDate(d.date)) + '</span><div class="t"><b>' + escapeHtml(d.name) + "</b><small>" + escapeHtml(d.who) + '</small></div><span class="a">' + yen(d.amount) + "</span></div>";
+  }).join("") + "</div></details>";
+  box.innerHTML = html;
+}
+
+function setDebtDir(dir) {
+  debtDraft.dir = dir;
+  Array.prototype.forEach.call(document.querySelectorAll("[data-debtdir]"), function (b) {
+    var on = b.getAttribute("data-debtdir") === dir;
+    b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  el("debtRecordRow").hidden = !(dir === "owed" && !debtDraft.id);
+}
+function renderDebtCats() {
+  var cats = finCats("expense");
+  if (!cats.some(function (c) { return c.id === debtDraft.cat; })) debtDraft.cat = cats.length ? cats[0].id : "";
+  el("debtCatChips").innerHTML = cats.map(function (c) {
+    return '<button type="button" class="cat-chip' + (c.id === debtDraft.cat ? " on" : "") + '" data-debtcat="' + c.id + '"><i style="background:' + finCatColor(c) + '"></i>' + escapeHtml(finCatName(c)) + "</button>";
+  }).join("");
+}
+function openDebtModal(id, dir) {
+  var d = id ? fin.items.filter(function (x) { return x.id === id && x.kind === "debt"; })[0] : null;
+  debtDraft.id = d ? d.id : null;
+  debtDraft.cat = d ? d.cat : "";
+  el("debtModalTitle").textContent = t(d ? "debtEdit" : "debtNew");
+  el("fDebtWho").value = d ? d.who : "";
+  el("fDebtName").value = d ? d.name : "";
+  el("fDebtAmount").value = d ? d.amount : "";
+  el("fDebtDate").value = d ? d.date : todayStr();
+  var names = {}; finDebts().forEach(function (x) { names[x.who.trim()] = 1; });
+  el("debtWhoList").innerHTML = Object.keys(names).map(function (n) { return '<option value="' + escapeHtml(n) + '">'; }).join("");
+  el("btnDebtDelete").style.display = d ? "inline-block" : "none";
+  el("fDebtRecord").checked = true;
+  var hasAcct = finAccts().length > 0;
+  el("fDebtAcct").style.display = hasAcct ? "" : "none";
+  if (hasAcct) fillAcctSelect(el("fDebtAcct"), finMainAcct() && finMainAcct().id);
+  setDebtDir(d ? d.dir : (dir || debtView.dir));
+  renderDebtCats();
+  el("debtModalOverlay").classList.add("open");
+  el("fDebtWho").focus();
+}
+function closeDebtModal() { el("debtModalOverlay").classList.remove("open"); }
+function submitDebt(e) {
+  e.preventDefault();
+  var who = el("fDebtWho").value.trim(), name = el("fDebtName").value.trim(), amount = parseFloat(el("fDebtAmount").value);
+  if (!who) { el("fDebtWho").focus(); return; }
+  if (!(amount > 0)) { el("fDebtAmount").focus(); return; }
+  var rec = { id: debtDraft.id || uid(), kind: "debt", dir: debtDraft.dir, who: who, name: name || who, amount: amount, date: el("fDebtDate").value || todayStr(), cat: debtDraft.cat };
+  var i = fin.items.findIndex(function (x) { return x.id === rec.id; });
+  if (i >= 0) fin.items[i] = rec; else fin.items.push(rec);
+  // "they owe me": the money I already paid out is booked as an expense now (unless I untick it)
+  if (i < 0 && rec.dir === "owed" && el("fDebtRecord").checked) {
+    var tx = { id: uid(), kind: "tx", type: "expense", amount: amount, date: rec.date, cat: rec.cat, note: t("debtRecordNote", { who: who, name: rec.name }) };
+    if (finAccts().length) tx.acct = el("fDebtAcct").value;
+    fin.items.push(tx);
+  }
+  debtView.dir = rec.dir;
+  if (typeof homeShow === "function" && homePrefs.hidden.indexOf("fin-debt") !== -1) { finSave(); homeShow("fin-debt"); } 
+  finSave(); closeDebtModal(); finRenderAll();
+  showToast(t("debtSaved"));
+}
+function deleteDebt() {
+  if (!debtDraft.id || !confirm(t("debtDeleteConfirm"))) return;
+  fin.items = fin.items.filter(function (x) { return x.id !== debtDraft.id; });
+  finSave(); closeDebtModal(); finRenderAll();
+}
+// ---- settle (all items of one person, oldest first, or a single item) ----
+function openDebtPay(ids, dir, who) {
+  var list = ids.map(function (id) { return fin.items.filter(function (x) { return x.id === id; })[0]; }).filter(Boolean);
+  if (!list.length) return;
+  debtPay = { ids: ids, dir: dir, who: who };
+  var left = list.reduce(function (s, d) { return s + finDebtLeft(d); }, 0);
+  el("debtPayTitle").textContent = t(dir === "owe" ? "debtPayTitle" : "debtRecvTitle", { who: who });
+  el("debtPaySum").textContent = list.map(function (d) { return d.name; }).join(" · ") + "  (" + t("debtPayHint", { n: money(left) }) + ")";
+  el("fDebtPayAmount").value = left; el("fDebtPayAmount").max = left;
+  el("fDebtPayDate").value = todayStr();
+  var hasAcct = finAccts().length > 0;
+  el("debtPayAcctRow").hidden = !hasAcct;
+  el("debtPayAcctLabel").textContent = t(dir === "owe" ? "debtPayFrom" : "debtRecvTo");
+  if (hasAcct) fillAcctSelect(el("fDebtPayAcct"), finMainAcct() && finMainAcct().id);
+  el("debtPayOverlay").classList.add("open");
+  el("fDebtPayAmount").focus();
+}
+function closeDebtPay() { el("debtPayOverlay").classList.remove("open"); }
+function submitDebtPay(e) {
+  e.preventDefault();
+  var amt = parseFloat(el("fDebtPayAmount").value) || 0;
+  var list = debtPay.ids.map(function (id) { return fin.items.filter(function (x) { return x.id === id; })[0]; }).filter(Boolean)
+    .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  var cap = list.reduce(function (s, d) { return s + finDebtLeft(d); }, 0);
+  amt = Math.min(amt, cap);
+  if (!(amt > 0)) { el("fDebtPayAmount").focus(); return; }
+  var date = el("fDebtPayDate").value || todayStr(), owe = debtPay.dir === "owe", rest = amt;
+  list.forEach(function (d) {
+    if (rest <= 0) return;
+    var part = Math.min(rest, finDebtLeft(d)); if (part <= 0) return;
+    rest -= part;
+    var tx = { id: uid(), kind: "tx", type: owe ? "expense" : "income", amount: Math.round(part * 100) / 100, date: date, cat: owe ? d.cat : "cat-refund",
+      note: t(owe ? "debtPayNote" : "debtRecvNote", { who: d.who, name: d.name }), debt: d.id };
+    if (finAccts().length) tx.acct = el("fDebtPayAcct").value;
+    fin.items.push(tx);
+  });
+  finSave(); closeDebtPay(); finRenderAll();
+  showToast(t("debtSaved"));
+}
+
 // ================= recurring plan =================
 function recMoney(n) { return n ? money(n) : "–"; }
 function recGridHtml() {
@@ -163,7 +344,7 @@ function recGridHtml() {
     var sum = 0, cells = keys.map(function (k) {
       var st = recStateIn(r, k), a = recAmountIn(r, k); sum += a;
       var c = st === "due" ? money(a) : (st === "done" ? '<span class="end">' + escapeHtml(t("recDone")) + "</span>" : '<span class="dash">–</span>');
-      return '<td class="' + (k === nowKey ? "cur" : "") + '">' + c + "</td>";
+      return '<td class="' + (k === nowKey ? "cur" : "") + (r.type === "income" && st === "due" ? " inc-cell" : "") + '">' + c + "</td>";
     }).join("");
     var note = r.count > 0 ? ' <small>' + escapeHtml(t("recInst", { n: r.count })) + "</small>" : "";
     return '<tr class="rg-row' + (r.invest ? " inv" : "") + '" data-recedit="' + r.id + '" tabindex="0"><td class="rg-item">' + (r.invest ? svgIcon("chart") : "") + escapeHtml(r.name) + note + "</td>" + cells + '<td class="rg-y">' + recMoney(sum) + "</td></tr>";
@@ -284,6 +465,16 @@ function finAccClick(e) {
   if ((b = e.target.closest("[data-acctedit]"))) { e.stopPropagation(); openAcctModal(b.getAttribute("data-acctedit")); return true; }
   if ((b = e.target.closest("[data-accsel]"))) { accView.sel = b.getAttribute("data-accsel"); renderFinAcc(); return true; }
   if ((b = e.target.closest("[data-paycard]"))) { payCard(b.getAttribute("data-paycard")); return true; }
+  if ((b = e.target.closest("[data-instedit]"))) { openTxModal(b.getAttribute("data-instedit"), "expense"); return true; }
+  if ((b = e.target.closest("[data-debtnew]"))) { openDebtModal(null); return true; }
+  if ((b = e.target.closest("[data-debtpay]"))) { e.stopPropagation(); var dd = fin.items.filter(function (x) { return x.id === b.getAttribute("data-debtpay"); })[0]; if (dd) openDebtPay([dd.id], dd.dir, dd.who); return true; }
+  if ((b = e.target.closest("[data-debtpayall]"))) {
+    var who = b.getAttribute("data-debtpayall"), g = debtGroups(debtView.dir).filter(function (x) { return x.who === who; })[0];
+    if (g) openDebtPay(g.items.map(function (d) { return d.id; }), debtView.dir, g.who);
+    return true;
+  }
+  if ((b = e.target.closest("[data-debtedit]"))) { openDebtModal(b.getAttribute("data-debtedit")); return true; }
+  if ((b = e.target.closest("[data-debtdir-view]"))) { debtView.dir = b.getAttribute("data-debtdir-view"); renderFinDebt(); return true; }
   if ((b = e.target.closest("[data-recnew]"))) { openRecModal(null); return true; }
   if ((b = e.target.closest("[data-recedit]"))) { openRecModal(b.getAttribute("data-recedit")); return true; }
   if ((b = e.target.closest("[data-recmode]"))) { recView.mode = b.getAttribute("data-recmode"); renderFinRec(); return true; }
@@ -313,7 +504,33 @@ function finAccClick(e) {
   HOME_WIDGETS.splice(ri < 0 ? HOME_WIDGETS.length : ri, 0, w);
 })();
 
+(function registerDebtWidget() {
+  var w = { id: "fin-debt", titleKey: "wFinDebt", size: "m", icon: "users", more: { page: "fin-debt" }, render: function (b) {
+    var out = "";
+    ["owe", "owed"].forEach(function (dir) {
+      var gs = debtGroups(dir); if (!gs.length) return;
+      out += gs.slice(0, 3).map(function (g) {
+        return '<button type="button" class="acc-mini-row" data-debtgo="' + dir + '"><span class="av sm" style="background:' + avatarColor(g.who) + '">' + escapeHtml(g.who.charAt(0).toUpperCase()) + "</span><span>" + escapeHtml(g.who) + " <small>" + escapeHtml(t(dir === "owe" ? "debtOwe" : "debtOwed")) + "</small></span><b" + (dir === "owe" ? ' class="neg"' : ' class="pos"') + ">" + yen(g.total) + "</b></button>";
+      }).join("");
+    });
+    b.innerHTML = out ? '<div class="acc-mini">' + out + "</div>" : '<div class="hempty">' + escapeHtml(t("debtEmptyOwe")) + "</div>";
+  } };
+  var ri = HOME_WIDGETS.findIndex(function (x) { return x.id === "fin-acc"; });
+  HOME_WIDGETS.splice(ri < 0 ? HOME_WIDGETS.length : ri + 1, 0, w);
+})();
+
 function initFinAcc() {
+  el("closeDebtModal").addEventListener("click", closeDebtModal);
+  el("cancelDebtForm").addEventListener("click", closeDebtModal);
+  el("debtModalOverlay").addEventListener("click", function (e) { if (e.target === this) closeDebtModal(); });
+  el("debtForm").addEventListener("submit", submitDebt);
+  el("btnDebtDelete").addEventListener("click", deleteDebt);
+  el("debtDirSeg").addEventListener("click", function (e) { var b = e.target.closest("[data-debtdir]"); if (b) setDebtDir(b.getAttribute("data-debtdir")); });
+  el("debtCatChips").addEventListener("click", function (e) { var b = e.target.closest("[data-debtcat]"); if (b) { debtDraft.cat = b.getAttribute("data-debtcat"); renderDebtCats(); } });
+  el("closeDebtPay").addEventListener("click", closeDebtPay);
+  el("cancelDebtPay").addEventListener("click", closeDebtPay);
+  el("debtPayOverlay").addEventListener("click", function (e) { if (e.target === this) closeDebtPay(); });
+  el("debtPayForm").addEventListener("submit", submitDebtPay);
   el("closeAcctModal").addEventListener("click", closeAcctModal);
   el("cancelAcctForm").addEventListener("click", closeAcctModal);
   el("acctModalOverlay").addEventListener("click", function (e) { if (e.target === this) closeAcctModal(); });
@@ -327,17 +544,19 @@ function initFinAcc() {
   el("btnRecDelete").addEventListener("click", deleteRec);
   el("recTypeSeg").addEventListener("click", function (e) { var b = e.target.closest("[data-rectype]"); if (b) setRecType(b.getAttribute("data-rectype")); });
   // keyboard: Enter / Space on a card or a grid row
-  ["finAccBody", "finRecBody"].forEach(function (id) {
+  ["finAccBody", "finRecBody", "finDebtBody"].forEach(function (id) {
     el(id).addEventListener("keydown", function (e) {
       if (e.key !== "Enter" && e.key !== " ") return;
       var t0 = e.target;
-      if (t0.matches && (t0.matches("[data-accsel]") || t0.matches("tr[data-recedit]"))) { e.preventDefault(); t0.click(); }
+      if (t0.matches && (t0.matches("[data-accsel]") || t0.matches("tr[data-recedit]") || t0.matches(".iou-r[data-debtedit]"))) { e.preventDefault(); t0.click(); }
     });
   });
   el("txTypeSeg").addEventListener("click", function () { /* account labels follow setTxType */ });
   el("homeGrid").addEventListener("click", function (e) {
     if (typeof homeEdit !== "undefined" && homeEdit) return;
     var b = e.target.closest("[data-accgo]");
-    if (b) { accView.sel = b.getAttribute("data-accgo"); navigate("fin-acc"); }
+    if (b) { accView.sel = b.getAttribute("data-accgo"); navigate("fin-acc"); return; }
+    var g = e.target.closest("[data-debtgo]");
+    if (g) { debtView.dir = g.getAttribute("data-debtgo"); navigate("fin-debt"); }
   });
 }

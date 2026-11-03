@@ -5,17 +5,17 @@ var THEME_KEY = "preorderVault_theme";
 var HEADER_KEY = "preorderVault_header";
 // List view + status groups (remembered between visits).
 var VIEW_KEY = "preorderVault_view_v2";
-var viewPrefs = { view: "list", group: true, collapsed: {} };
+var viewPrefs = { view: "list", group: false, collapsed: {} };
 try {
   var savedView = JSON.parse(localStorage.getItem(VIEW_KEY) || "null");
   if (savedView) {
     if (savedView.view === "list" || savedView.view === "cards") viewPrefs.view = savedView.view;
-    if (typeof savedView.group === "boolean") viewPrefs.group = savedView.group;
+    if (typeof savedView.group === "boolean" && savedView.g2) viewPrefs.group = savedView.group;
     if (savedView.collapsed && typeof savedView.collapsed === "object") viewPrefs.collapsed = savedView.collapsed;
   }
 } catch (e) { /* ignore */ }
 function saveViewPrefs() {
-  try { localStorage.setItem(VIEW_KEY, JSON.stringify(viewPrefs)); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(VIEW_KEY, JSON.stringify({ view: viewPrefs.view, group: viewPrefs.group, collapsed: viewPrefs.collapsed, g2: 1 })); } catch (e) { /* ignore */ }
 }
 var STATUS_GROUPS = [
   { key: "pay",       statuses: ["deposit"],                          labelKey: "groupPay",       icon: "deposit" },

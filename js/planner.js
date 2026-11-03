@@ -7,7 +7,8 @@
 var planView = { mode: "week", anchor: todayStr(), sel: todayStr() };
 var evtDraft = { id: null, color: 0, allDay: false };
 var PLAN_COLORS = 6;
-var PLAN_HOUR_PX = 48;
+var PLAN_HOUR_PX = 56;
+var planHH = 0;   // hour height filled to the panel (0 = default)
 var PLAN_LIST_DAYS = 60;
 
 // ---- date helpers ----
@@ -36,12 +37,12 @@ function planDues() {
   var out = [];
   activeOrders().forEach(function (o) {
     var rem = remainingOf(o);
-    if (rem > 0 && o.dueDate) out.push({ date: o.dueDate, label: t("planDuePay", { name: o.productName || t("noName"), n: money(rem) }), orderId: o.id });
+    if (rem > 0 && o.dueDate) out.push({ date: o.dueDate, label: t("planDuePay", { name: o.productName || t("noName"), n: money(rem) }), name: o.productName || t("noName"), amt: rem, orderId: o.id });
   });
   finAccts().forEach(function (a) {
     if (a.type !== "card" || !a.due) return;
     var owed = finCardOwed(a);
-    if (owed > 0) out.push({ date: nextDayOfMonth(parseInt(a.due, 10)), label: t("planDueCard", { name: a.name, n: money(owed) }), acctId: a.id });
+    if (owed > 0) out.push({ date: nextDayOfMonth(parseInt(a.due, 10)), label: t("planDueCard", { name: a.name, n: money(owed) }), name: a.name, amt: owed, acctId: a.id });
   });
   return out;
 }
@@ -61,14 +62,43 @@ function planDay(ds, dues) {
 }
 
 // ---- rendering ----
-function planNavHtml(label) {
-  var now = planView.mode === "list" ? "" : '<button type="button" class="chip" data-plan-today="1">' + escapeHtml(t("planToday")) + "</button>";
-  var arrows = planView.mode === "list" ? "" : '<button type="button" class="icon-toggle" data-plan-nav="-1" aria-label="' + escapeHtml(t("finPrevMonth")) + '">' + svgIcon("chev-l") + "</button>" +
-    '<button type="button" class="icon-toggle" data-plan-nav="1" aria-label="' + escapeHtml(t("finNextMonth")) + '">' + svgIcon("chev-r") + "</button>";
-  var seg = ["week", "month", "list"].map(function (m) {
-    return '<button type="button" class="chip' + (planView.mode === m ? " active" : "") + '" data-plan-mode="' + m + '">' + escapeHtml(t("plan" + m.charAt(0).toUpperCase() + m.slice(1))) + "</button>";
-  }).join("");
-  return '<div class="pl-bar"><div class="pl-seg">' + seg + '</div><div class="pl-nav">' + arrows + now + "</div><b class=\"pl-range\">" + escapeHtml(label) + "</b></div>";
+function planTabsHtml() {
+  return '<nav class="fin-subnav pl-tabs">' + ["week", "month", "list"].map(function (m) {
+    return '<button type="button" class="chip' + (planView.mode === m ? " active" : "") + '" data-plan-mode="' + m + '"><span>' + escapeHtml(t("plan" + m.charAt(0).toUpperCase() + m.slice(1))) + "</span></button>";
+  }).join("") + "</nav>";
+}
+function planToolsHtml(label) {
+  var nav = planView.mode === "list" ? "" : '<div class="pl-nav2"><button type="button" class="icon-toggle" data-plan-nav="-1" aria-label="' + escapeHtml(t("finPrevMonth")) + '">' + svgIcon("chev-l") + "</button>" +
+    '<b class="pl-range">' + escapeHtml(label) + '</b><button type="button" class="icon-toggle" data-plan-nav="1" aria-label="' + escapeHtml(t("finNextMonth")) + '">' + svgIcon("chev-r") + "</button>" +
+    '<button type="button" class="chip" data-plan-today="1">' + escapeHtml(t("planToday")) + "</button></div>";
+  return nav + '<button type="button" class="btn-primary" data-plan-new="1">' + svgIcon("plus") + "<span>" + escapeHtml(t("planAdd")) + "</span></button>";
+}
+function planLabel() {
+  if (planView.mode === "month") return monthLabelOf(planView.anchor.slice(0, 7));
+  if (planView.mode === "list") return t("planListRange", { n: PLAN_LIST_DAYS });
+  var st = pWeekStart(planView.anchor);
+  return shortDate(st) + " – " + shortDate(pAdd(st, 6));
+}
+// right-hand column: the chosen day + payments falling due in view
+function planSideHtml() {
+  var dues = planDues(), today = todayStr(), ds = planView.sel, x = planDay(ds, dues), rows = "";
+  function row(tm, it, d) {
+    return '<button type="button" class="pl-srow c' + (it.e.color | 0) + '" data-plan-evt="' + it.e.id + '" data-plan-date="' + d + '"><span class="tm">' + escapeHtml(tm) + '</span><i class="bar"></i><span class="tt"><b>' + escapeHtml(it.e.title) + "</b>" + (it.e.note ? "<small>" + escapeHtml(it.e.note) + "</small>" : "") + "</span></button>";
+  }
+  x.all.forEach(function (it) { rows += row(t("planAllDay"), it, ds); });
+  x.timed.forEach(function (it) { rows += row(pHM(it.s), it, ds); });
+  if (!rows) rows = '<div class="hempty">' + escapeHtml(t("planNothing")) + "</div>";
+  var p1 = panelHtml("p-sched", ds === today ? t("planToday") : pWeekday(ds, "long"), shortDate(ds), null, rows);
+  var from, to, key;
+  if (planView.mode === "month") { key = planView.anchor.slice(0, 7); from = key + "-01"; to = key + "-31"; key = "planDueMonth"; }
+  else if (planView.mode === "list") { from = today; to = pAdd(today, 30); key = "planDueNext"; }
+  else { from = pWeekStart(planView.anchor); to = pAdd(from, 6); key = "planDueWeek"; }
+  var list = dues.filter(function (d) { return d.date >= from && d.date <= to; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+  var body = list.length ? list.map(function (d) {
+    return '<button type="button" class="pl-srow due" data-plan-due="' + (d.orderId ? "o:" + d.orderId : "a:" + d.acctId) + '"><span class="tm">' + escapeHtml(shortDate(d.date)) + '</span><i class="bar"></i><span class="tt"><b>' + escapeHtml(d.name) + '</b></span><span class="amt">' + yen(d.amt) + "</span></button>";
+  }).join("") : '<div class="hempty">' + escapeHtml(t("planNoDue")) + "</div>";
+  var p2 = panelHtml("p-due", t(key), "", null, body);
+  return p1 + p2;
 }
 function planDueChip(d) {
   return '<button type="button" class="pl-due" data-plan-due="' + (d.orderId ? "o:" + d.orderId : "a:" + d.acctId) + '">' + svgIcon("flag") + "<span>" + escapeHtml(d.label) + "</span></button>";
@@ -103,11 +133,11 @@ function planWeekHtml() {
   var start = pWeekStart(planView.anchor), today = todayStr(), dues = planDues();
   var days = []; for (var i = 0; i < 7; i++) days.push(pAdd(start, i));
   var data = days.map(function (d) { return planDay(d, dues); });
-  var minH = 8, maxH = 18;
+  var minH = 8, maxH = 21;
   data.forEach(function (x) { x.timed.forEach(function (it) { minH = Math.min(minH, Math.floor(it.s / 60)); maxH = Math.max(maxH, Math.ceil(it.en / 60)); }); });
-  var hours = maxH - minH, hh = PLAN_HOUR_PX;
+  var hours = maxH - minH, hh = planHH || PLAN_HOUR_PX;
   var head = '<div class="pl-corner"></div>' + days.map(function (d, i) {
-    return '<div class="pl-dh' + (d === today ? " today" : "") + '"><small>' + escapeHtml(pWeekday(d)) + "</small><b>" + pDate(d).getDate() + "</b></div>";
+    return '<div class="pl-dh' + (d === today ? " today" : "") + (d === planView.sel ? " sel" : "") + '" data-plan-sel="' + d + '"><small>' + escapeHtml(pWeekday(d)) + "</small><b>" + pDate(d).getDate() + "</b></div>";
   }).join("");
   var allRow = '<div class="pl-corner"></div>' + days.map(function (d, i) {
     return '<div class="pl-allcell' + (d === today ? " today" : "") + '" data-plan-newday="' + d + '">' + data[i].dues.map(planDueChip).join("") + data[i].all.map(planEvChip).join("") + "</div>";
@@ -125,10 +155,10 @@ function planWeekHtml() {
       var nm = new Date(); var mins = nm.getHours() * 60 + nm.getMinutes();
       if (mins >= minH * 60 && mins <= maxH * 60) nowLine = '<i class="pl-now" style="top:' + ((mins - minH * 60) / 60 * hh) + 'px"></i>';
     }
-    return '<div class="pl-col' + (d === today ? " today" : "") + '" data-plan-col="' + d + '" data-minh="' + minH + '" style="height:' + hours * hh + 'px;--hh:' + hh + 'px">' + items + nowLine + "</div>";
+    return '<div class="pl-col' + (d === today ? " today" : "") + '" data-plan-col="' + d + '" data-minh="' + minH + '" data-hours="' + hours + '" style="height:' + hours * hh + 'px;--hh:' + hh + 'px">' + items + nowLine + "</div>";
   }).join("");
   var label = shortDate(days[0]) + " – " + shortDate(days[6]);
-  return planNavHtml(label) + '<div class="pl-week"><div class="pl-grid pl-head">' + head + '</div><div class="pl-grid pl-allrow">' + allRow +
+  return '<div class="pl-week"><div class="pl-grid pl-head">' + head + '</div><div class="pl-grid pl-allrow">' + allRow +
     '</div><div class="pl-grid pl-body"><div class="pl-hours">' + labels + "</div>" + cols + "</div></div>" + planDayViewHtml(days);
 }
 
@@ -166,7 +196,7 @@ function planMonthHtml() {
     cells += '<div class="pl-mc' + (out ? " out" : "") + (d === today ? " today" : "") + (d === planView.sel ? " sel" : "") + '" data-plan-sel="' + d + '" data-plan-newday="' + d + '"><b>' + pDate(d).getDate() + "</b>" + shown.join("") +
       (more > 0 ? '<span class="pl-more">' + escapeHtml(t("planMore", { n: more })) + "</span>" : "") + '<span class="pl-dots">' + dots + "</span></div>";
   }
-  return planNavHtml(monthLabelOf(key)) + '<div class="pl-month"><div class="pl-mh">' + head + '</div><div class="pl-mg">' + cells + '</div></div><div class="pl-agenda pl-agenda-m">' + planAgendaHtml(planView.sel) + "</div>";
+  return '<div class="pl-month"><div class="pl-mh">' + head + '</div><div class="pl-mg">' + cells + '</div></div><div class="pl-agenda pl-agenda-m">' + planAgendaHtml(planView.sel) + "</div>";
 }
 
 function planListHtml() {
@@ -181,7 +211,7 @@ function planListHtml() {
       x.timed.map(function (it) { return planListRow(it, pHM(it.s) + " – " + pHM(it.en), d); }).join("") + "</div>";
   }
   if (!n) html = '<div class="hempty wide">' + escapeHtml(t("planNothingList")) + "</div>";
-  return planNavHtml(t("planListRange", { n: PLAN_LIST_DAYS })) + '<div class="pl-list">' + html + "</div>";
+  return '<div class="pl-list">' + html + "</div>";
 }
 function planListRow(it, time, d) {
   return '<button type="button" class="pl-lrow c' + (it.e.color | 0) + '" data-plan-evt="' + it.e.id + '" data-plan-date="' + d + '"><span class="tm">' + escapeHtml(time) + '</span><i class="bar"></i><span class="tt"><b>' + escapeHtml(it.e.title) + "</b>" + (it.e.note ? "<small>" + escapeHtml(it.e.note) + "</small>" : "") + "</span></button>";
@@ -190,9 +220,28 @@ function planListRow(it, time, d) {
 function renderPlanner() {
   var box = el("planBody"), tools = el("planTools");
   if (!fin.loaded) { box.innerHTML = ""; tools.innerHTML = ""; return; }
-  tools.innerHTML = '<div class="fin-addbtns"><button type="button" class="btn-primary" data-plan-new="1">' + svgIcon("plus") + "<span>" + escapeHtml(t("planAdd")) + "</span></button></div>";
-  box.innerHTML = planView.mode === "month" ? planMonthHtml() : planView.mode === "list" ? planListHtml() : planWeekHtml();
+  var body = planView.mode === "month" ? planMonthHtml() : planView.mode === "list" ? planListHtml() : planWeekHtml();
+  tools.innerHTML = planToolsHtml(planLabel());
+  var build = function () {
+    box.innerHTML = planTabsHtml() + '<div class="pl-layout plm-' + planView.mode + '"><section class="panel pl-main"><div class="pb">' + (planView.mode === "week" ? planWeekHtml() : body) + '</div></section><aside class="pl-side">' + planSideHtml() + "</aside></div>";
+  };
+  planHH = 0;
+  build();
+  // week view: stretch the hours so the grid fills the panel (whatever the screen / zoom)
+  if (planView.mode === "week" && window.matchMedia("(min-width:900px)").matches) {
+    var pb = box.querySelector(".pl-main > .pb"), bd = box.querySelector(".pl-body"), hrs = box.querySelector(".pl-hours");
+    if (pb && bd && hrs && pb.offsetHeight) {
+      var k = pb.getBoundingClientRect().height / pb.offsetHeight || 1;
+      var free = (pb.getBoundingClientRect().bottom - bd.getBoundingClientRect().top) / k;
+      var n = hrs.children.length, hh = Math.floor((free - 2) / n);
+      if (n && hh > PLAN_HOUR_PX && hh < 200) { planHH = hh; build(); }
+    }
+  }
 }
+window.addEventListener("resize", function () {
+  clearTimeout(window.__plRz);
+  window.__plRz = setTimeout(function () { if (typeof currentPageId !== "undefined" && currentPageId === "schedule" && typeof renderPlanner === "function") renderPlanner(); }, 200);
+});
 
 // ---- event modal ----
 function renderEvtColors() {
@@ -261,14 +310,13 @@ function planClick(e) {
   }
   if ((b = e.target.closest("[data-plan-evt]"))) { openEvtModal(b.getAttribute("data-plan-evt")); return; }
   if ((b = e.target.closest("[data-plan-col]")) && !e.target.closest("[data-plan-evt]")) {
-    var r = b.getBoundingClientRect(), hour = Math.floor((e.clientY - r.top) / PLAN_HOUR_PX) + parseInt(b.getAttribute("data-minh"), 10);
+    var r = b.getBoundingClientRect(), hour = Math.floor((e.clientY - r.top) / (r.height / (parseInt(b.getAttribute("data-hours"), 10) || 1))) + parseInt(b.getAttribute("data-minh"), 10);
     openEvtModal(null, b.getAttribute("data-plan-col"), Math.max(0, Math.min(22, hour))); return;
   }
   if ((b = e.target.closest(".pl-add, [data-plan-newday].btn-ghost-sm, .pl-allcell[data-plan-newday]"))) { openEvtModal(null, b.getAttribute("data-plan-newday")); return; }
   if ((b = e.target.closest("[data-plan-sel]"))) {
     var d = b.getAttribute("data-plan-sel"), wasSel = planView.sel === d;
     planView.sel = d;
-    if (planView.mode === "month" && window.matchMedia("(min-width: 761px)").matches) { openEvtModal(null, d); return; }
     renderPlanner(); return;
   }
 }

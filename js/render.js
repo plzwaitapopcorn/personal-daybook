@@ -176,6 +176,8 @@ function renderGrid() {
     if (state.orders.length === 0) {
       document.getElementById("emptyAddBtn").addEventListener("click", function () { openOrderModal(); });
     }
+    ordSel = null;
+    renderOrderSide();
     return;
   }
 
@@ -211,19 +213,20 @@ function renderGrid() {
   };
 
   var rowHtml = function (o) {
-    var style = STATUS_STYLE[o.status] || STATUS_STYLE.deposit;
     var remain = remainingOf(o);
     var thumb = o.mainImage
       ? '<img src="' + (o.mainThumb || o.mainImage).replace(/"/g, "&quot;") + '" alt="" loading="lazy">'
       : placeholderSvg();
+    var pct = ordPaidPct(o);
     return (
-      '<article class="row' + (o.status === "cancelled" ? " is-cancelled" : "") + (selected[o.id] ? " is-selected" : "") + '" data-id="' + o.id + '">' + '<span class="sel-box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span>' +
+      '<article class="row' + (o.status === "cancelled" ? " is-cancelled" : "") + (selected[o.id] ? " is-selected" : "") + (o.id === ordSel ? " is-active" : "") + '" data-id="' + o.id + '">' + '<span class="sel-box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span>' +
         '<div class="row-thumb">' + thumb + "</div>" +
         '<div class="row-main"><div class="row-title">' + nameHtml(o) + '</div>' +
-          '<div class="row-shop">🏬 ' + escapeHtml(o.shopName || t("noShop")) + "</div></div>" +
-        '<div class="row-date">' + formatDateLong(o.purchaseDate) + "</div>" +
-        '<div class="row-price">' + priceHtml(o) +
-          (remain > 0 ? '<div class="remain">' + t("dueLine", { remain: money(remain) }) + "</div>" : "") + "</div>" +
+          '<div class="row-shop">' + escapeHtml(o.shopName || t("noShop")) + "</div></div>" +
+        '<div class="row-date">' + formatDateShort(o.purchaseDate) + "</div>" +
+        '<div class="row-price">' + priceHtml(o) + "</div>" +
+        '<div class="row-due' + (remain > 0 ? " neg" : "") + '">' + (remain > 0 ? "฿" + money(remain) : "\u2014") + "</div>" +
+        '<div class="row-prog">' + (pct === null ? '<span class="na">\u2014</span>' : '<div class="pbar"><i style="width:' + pct + '%"></i></div>') + "</div>" +
         '<div class="row-status">' + statusSelectHtml(o) + "</div>" +
       "</article>"
     );
@@ -235,6 +238,15 @@ function renderGrid() {
   var wrap = function (items) {
     return '<div class="' + (useList ? "list" : "grid") + '">' + items.map(itemHtml).join("") + "</div>";
   };
+  var thHtml = useList
+    ? '<div class="ord-th"><span></span><span>' + t("ordColOrder") + "</span><span>" + t("ordColDate") + '</span><span class="r">' + t("ordColTotal") +
+      '</span><span class="r">' + t("ordColDue") + "</span><span>" + t("ordColPaid") + "</span><span>" + t("ordColStatus") + "</span></div>"
+    : "";
+  if (useList && !list.some(function (o) { return o.id === ordSel; })) ordSel = list[0].id;
+  var lay = document.getElementById("ordLayout");
+  if (lay) lay.classList.toggle("is-cards", !useList);
+  var meta = document.getElementById("ordMeta");
+  if (meta) meta.textContent = t(state.sort === "newest" ? "ordMetaNewest" : state.sort === "oldest" ? "ordMetaOldest" : "ordMetaStatus");
 
   if (!useList && !useGroups) {
     grid.className = "grid";
@@ -242,9 +254,9 @@ function renderGrid() {
   } else {
     grid.className = "grid-flow";
     if (!useGroups) {
-      grid.innerHTML = wrap(list);
+      grid.innerHTML = thHtml + wrap(list);
     } else {
-      grid.innerHTML = STATUS_GROUPS.map(function (g) {
+      grid.innerHTML = thHtml + STATUS_GROUPS.map(function (g) {
         var items = list.filter(function (o) { return g.statuses.indexOf(o.status) !== -1; });
         if (!items.length) return "";
         var collapsed = !!viewPrefs.collapsed[g.key];
@@ -276,9 +288,15 @@ function renderGrid() {
     card.addEventListener("click", function (e) {
       if (selectMode) { toggleSelected(card.getAttribute("data-id")); return; }
       if (e.target.closest(".status-select")) return;
-      openDetailModal(card.getAttribute("data-id"));
+      var cid = card.getAttribute("data-id");
+      if (ordSideOn()) { ordSel = cid; ordSyncActive(); renderOrderSide(); return; }
+      openDetailModal(cid);
+    });
+    if (card.classList.contains("row")) card.addEventListener("dblclick", function (e) {
+      if (!selectMode && !e.target.closest(".status-select") && ordSideOn()) openDetailModal(card.getAttribute("data-id"));
     });
   });
+  renderOrderSide();
 
   Array.prototype.forEach.call(grid.querySelectorAll(".status-select"), function (sel) {
     sel.addEventListener("click", function (e) { e.stopPropagation(); });
@@ -295,8 +313,8 @@ function statusSelectHtml(o) {
   var options = ["wishlist", "deposit", "full", "shipping", "intransit", "received", "cancelled"].map(function (key) {
     return '<option value="' + key + '"' + (o.status === key ? " selected" : "") + ">" + statusLabel(key) + "</option>";
   }).join("");
-  return '<span class="status-pick" style="--c:var(--status-' + st + ')" title="' + escapeHtml(statusLabel(st)) + '">' +
-    '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-' + st + '"/></svg>' +
+  return '<span class="status-pick" data-st="' + st + '" style="--c:var(--status-' + st + ')" title="' + escapeHtml(statusLabel(st)) + '">' +
+    '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-' + st + '"/></svg><span class="sp-label">' + escapeHtml(statusLabel(st)) + "</span>" +
     '<select class="status-select" data-id="' + o.id + '" aria-label="' + t("changeStatusAria") + ": " + escapeHtml(statusLabel(st)) + '">' + options + "</select></span>";
 }
 
@@ -328,3 +346,74 @@ function renderAll() {
   if (typeof renderNav === "function") renderNav();
   if (typeof renderHome === "function" && currentPageId === "home") renderHome();
 }
+
+
+// ---------- Orders: selected order + detail side panel ----------
+var ordSel = null;
+function ordSideOn() { return viewPrefs.view === "list" && window.matchMedia("(min-width:900px)").matches; }
+function ordPaidPct(o) {
+  if (o.status === "wishlist") return null;
+  var full = Number(o.fullPrice) || 0;
+  if (o.status === "deposit") return full > 0 ? Math.max(0, Math.min(100, Math.round((Number(o.depositPaid) || 0) / full * 100))) : 0;
+  if (o.status === "cancelled") return null;
+  return 100;
+}
+function formatDateShort(dateStr) { return formatDateLong(dateStr); }
+function ordSyncActive() {
+  Array.prototype.forEach.call(document.querySelectorAll("#grid .row"), function (r) {
+    r.classList.toggle("is-active", r.getAttribute("data-id") === ordSel);
+  });
+}
+var ORD_STEP_OF = { wishlist: 0, deposit: 1, full: 2, shipping: 3, intransit: 3, received: 4 };
+function renderOrderSide() {
+  var box = document.getElementById("orderSide");
+  if (!box) return;
+  var o = state.orders.find(function (x) { return x.id === ordSel; });
+  if (!o) { box.innerHTML = ""; return; }
+  var remain = remainingOf(o);
+  var full = Number(o.fullPrice) || 0;
+  var pays = orderPayments(o).filter(function (r) { return r.type === "expense"; });
+  var paid = o.status === "wishlist" ? 0 : (o.status === "deposit" ? (Number(o.depositPaid) || 0) : (o.status === "cancelled" ? orderPaidTotal(o) : full));
+  var pct = full > 0 ? Math.max(0, Math.min(100, Math.round(paid / full * 100))) : 0;
+  var cancelled = o.status === "cancelled";
+  var cur = ORD_STEP_OF[o.status];
+  var thumb = o.mainImage
+    ? '<img src="' + (o.mainThumb || o.mainImage).replace(/"/g, "&quot;") + '" alt="">'
+    : placeholderSvg();
+  var steps = "";
+  if (!cancelled) {
+    for (var i = 0; i < 5; i++) {
+      var cls = i < cur ? "done" : (i === cur ? "now" : "");
+      steps += '<div class="stp ' + cls + '"><i>' + (i < cur ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7"/></svg>' : (i + 1)) + "</i><span>" + t("ordStep" + (i + 1)) + "</span></div>" +
+        (i < 4 ? '<em class="' + (i < cur ? "done" : "") + '"></em>' : "");
+    }
+  }
+  var payRows = pays.map(function (r) {
+    return '<div class="op-row"><span class="d">' + escapeHtml(formatDateShort(r.date)) + "</span><b>" + escapeHtml(t(PAY_KIND_KEY[r.kind] || "finKindPaid")) + "</b>" +
+      (r.acct ? "<small>" + escapeHtml(acctName(r.acct)) + "</small>" : "") + '<b class="a">฿' + money(r.amount) + "</b></div>";
+  }).join("") || '<div class="op-none">' + t("ordSideNoPay") + "</div>";
+  box.innerHTML =
+    '<section class="panel p-orders"><div class="ph"><div class="tg"></div><h2>' + t("ordSideTitle") + '</h2><button type="button" class="more" data-ord-open="1">' + t("ordSideOpen") + "</button></div>" +
+    '<div class="pb op-body">' +
+      '<div class="op-head"><div class="op-thumb">' + thumb + '</div><div class="op-tt"><div class="op-name">' + nameHtml(o) + '</div><div class="op-sub">' +
+        escapeHtml(o.shopName || t("noShop")) + " · " + t("ordSideOrderedOn") + " " + escapeHtml(formatDateShort(o.purchaseDate)) + "</div>" + statusSelectHtml(o) + "</div></div>" +
+      (cancelled ? "" : '<div class="op-k">' + t("ordSideProgress") + '</div><div class="op-steps">' + steps + "</div>") +
+      '<div class="op-nums"><div><div class="op-k">' + t("ordSideTotal") + '</div><div class="op-v">' + priceHtml(o) + '</div></div><div><div class="op-k">' + t("ordSidePaid") +
+        '</div><div class="op-v pos">฿' + money(paid) + '</div></div><div><div class="op-k">' + t("ordSideDue") + (o.dueDate && remain > 0 ? " " + escapeHtml(formatDateShort(o.dueDate)) : "") +
+        '</div><div class="op-v' + (remain > 0 ? " neg" : "") + '">' + (remain > 0 ? "฿" + money(remain) : "\u2014") + "</div></div></div>" +
+      '<div class="pbar op-bar"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="op-k">' + t("ordSidePayments") + "</div>" + payRows +
+      '<div class="op-actions">' +
+        ((o.status === "deposit" || o.status === "wishlist") ? '<button type="button" class="btn-primary" data-ord-pay="1">' + t("ordSideMarkPaid") + "</button>" : "") +
+        '<button type="button" class="btn-secondary" data-ord-edit="1">' + t("editBtn") + "</button></div>" +
+    "</div></section>";
+  var sel = box.querySelector(".status-select");
+  if (sel) {
+    sel.addEventListener("change", function () { updateOrderStatus(o.id, sel.value); });
+  }
+  box.querySelector("[data-ord-open]").addEventListener("click", function () { openDetailModal(o.id); });
+  box.querySelector("[data-ord-edit]").addEventListener("click", function () { openOrderModal(o.id); });
+  var pb = box.querySelector("[data-ord-pay]");
+  if (pb) pb.addEventListener("click", function () { updateOrderStatus(o.id, "full"); });
+}
+window.addEventListener("resize", function () { if (typeof renderGrid === "function" && currentPageId === "orders") { clearTimeout(window.__ordRz); window.__ordRz = setTimeout(renderGrid, 150); } });

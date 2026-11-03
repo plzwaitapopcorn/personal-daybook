@@ -446,6 +446,8 @@ function finRenderPage(page) {
 function finRenderAll() {
   if (FIN_PAGES.indexOf(currentPageId) !== -1) finRenderPage(currentPageId);
   if (currentPageId === "schedule" && typeof renderPlanner === "function") renderPlanner();
+  if (currentPageId === "vault" && typeof renderVault === "function") renderVault();
+  if (currentPageId === "office" && typeof renderOffice === "function") renderOffice();
   if (typeof renderHome === "function" && currentPageId === "home") renderHome();
   if (typeof renderNav === "function") renderNav();
 }

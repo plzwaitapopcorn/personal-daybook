@@ -15,7 +15,9 @@ var NAV_ITEMS = [
   { page: "orders",       icon: "bag",    labelKey: "navOrders",      sideKey: "navOrdersTab", tabKey: "navOrdersTab", group: "navGroupOrders", tileKey: "navGroupOrders", dot: "var(--c-orders)",
     count: function () { return state.orders.length; },
     tileSub: function () { return t("tileOrdersSub", { n: state.orders.length }); } },
-  { page: "schedule",     icon: "table",  labelKey: "navSchedule",    tabKey: "navSchedule",  group: "navGroupSchedule", dot: "var(--c-sched)" }
+  { page: "schedule",     icon: "table",  labelKey: "navSchedule",    tabKey: "navSchedule",  group: "navGroupSchedule", dot: "var(--c-sched)" },
+  { page: "office",       icon: "briefcase", labelKey: "navOffice",   sideKey: "navOffice", tabKey: "navOffice", group: "navGroupOffice", dot: "var(--c-red)" },
+  { page: "vault",        icon: "lock",   labelKey: "navVault",       sideKey: "navVault", tabKey: "navVault", group: "navGroupVault", dot: "#121212" }
 ];
 
 // Filled in by each feature module (finance-ui.js adds expense / income; the order add button lives here).
@@ -23,7 +25,7 @@ var QUICK_ADDS = [
   { id: "order", icon: "bag", labelKey: "addOrderBtn", run: function () { openOrderModal(); } }
 ];
 
-var PAGE_IDS = ["home", "fin", "fin-acc", "fin-rec", "fin-debt", "fin-cats", "schedule", "orders", "settings"];
+var PAGE_IDS = ["home", "fin", "fin-acc", "fin-rec", "fin-debt", "fin-cats", "schedule", "orders", "office", "vault", "settings"];
 var PAGE_ALIAS = { "fin-overview": "fin", "fin-list": "fin" };   // old bookmarks / links
 var currentPageId = "";
 var lastSubPage = {};     // area page -> sub-page last opened (so its tab returns there)
@@ -60,6 +62,8 @@ function showPage(page) {
   if (page === "home" && typeof renderHome === "function") renderHome();
   if ((page === "fin" || page === "fin-acc" || page === "fin-rec" || page === "fin-debt" || page === "fin-cats") && typeof finRenderPage === "function") finRenderPage(page);
   if (page === "schedule" && typeof renderPlanner === "function") renderPlanner();
+  if (page === "office" && typeof renderOffice === "function") renderOffice();
+  if (page === "vault" && typeof renderVault === "function") renderVault();
   if (page === "orders" && typeof renderAll === "function" && state.loaded) renderGrid();
 }
 

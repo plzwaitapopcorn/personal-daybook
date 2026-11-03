@@ -11,6 +11,8 @@ function init() {
   initSync();
   initFinance();
   initHome();
+  if (typeof initVault === "function") initVault();
+  if (typeof initOffice === "function") initOffice();
   initRouter();
   loadData().then(function () { return loadFinance().catch(function (e) { console.error("finance load", e); }); }).then(function () {
     syncInitMaps();

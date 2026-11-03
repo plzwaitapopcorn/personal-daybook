@@ -14,9 +14,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="css/app.css?v=20261103f">
-<link rel="stylesheet" href="css/theme-b.css?v=20261103f">
-<link rel="stylesheet" href="css/home-paper.css?v=20261103f">
+<link rel="stylesheet" href="css/app.css?v=20261103j">
+<link rel="stylesheet" href="css/theme-b.css?v=20261103j">
+<link rel="stylesheet" href="css/daybook.css?v=20261103j">
 </head>
 <body>
 
@@ -69,8 +69,8 @@
 
   <aside class="sidebar" id="sidebar">
     <a class="brand" href="#/home" aria-label="DAYBOOK">
-      <img src="icons/icon-192.png" alt="" width="34" height="34">
-      <b>DAY<i>BOOK</i></b>
+      <span class="sq" aria-hidden="true">DAY<br>BOOK</span>
+      <b>DAYBOOK</b>
     </a>
     <nav class="nav-list" id="navMain" aria-label="Main"></nav>
     <div class="sp"></div>
@@ -95,7 +95,7 @@
   <div class="app-main" id="appMain">
 
     <div class="mobile-top">
-      <a class="brand" href="#/home" aria-label="DAYBOOK"><img src="icons/icon-192.png" alt="" width="30" height="30"><b>DAY<i>BOOK</i></b></a>
+      <a class="brand" href="#/home" aria-label="DAYBOOK"><span class="sq" aria-hidden="true">DAY<br>BOOK</span><b>DAYBOOK</b></a>
       <a class="tool-btn js-settings-btn" href="#/settings" data-i18n-title="settingsTitle" title="ตั้งค่า" aria-label="ตั้งค่า">
         <svg class="ic" viewBox="0 0 24 24"><use href="#i-gear"/></svg>
       </a>
@@ -123,7 +123,14 @@
 
     <!-- ===== Orders ===== -->
     <section class="page" id="page-orders" data-page="orders" hidden>
-      <div class="page-title"><h2 data-i18n="navOrdersTitle">ของที่สั่งซื้อ</h2></div>
+      <div class="page-title pg-head"><h2 data-i18n="navOrdersTitle">ของที่สั่งซื้อ</h2><div class="pg-tools">
+        <button class="btn-primary" id="btnAdd" data-i18n-title="addOrderBtn" title="เพิ่มออเดอร์"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-plus"/></svg><span class="btn-label" data-i18n="addOrderBtn">เพิ่มออเดอร์</span></button>
+      </div></div>
+  <div class="kpi ord-kpi">
+    <div class="k k-red"><div class="bd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-clock"/></svg></div><div class="kt"><div class="l" data-i18n="statDueLabel">ค้างชำระ</div><div class="v" id="statRemain">฿0</div><div class="s">&nbsp;</div></div></div>
+    <div class="k k-yellow"><div class="bd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-bag"/></svg></div><div class="kt"><div class="l" data-i18n="statTotalLabel">ยอดรวม</div><div class="v" id="statSpent">฿0</div><div class="s">&nbsp;</div></div></div>
+    <div class="k k-green"><div class="bd"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-check"/></svg></div><div class="kt"><div class="l" data-i18n="statReceivedLabel">รับแล้ว</div><div class="v"><span id="statReceived">0</span></div><div class="s"><span id="statOfTotal">จาก 0</span></div><div class="progress-track"><div class="progress-fill" id="statProgressFill" style="width:0%"></div></div></div></div>
+  </div>
   <div class="layout">
     <div class="main-col">
       <div class="chip-row" id="statusChips">
@@ -178,37 +185,7 @@
       </div>
     </div>
 
-    <aside class="rail">
-      <button class="btn-primary" id="btnAdd" data-i18n-title="addOrderBtn" title="เพิ่มออเดอร์">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-        <span class="btn-label" data-i18n="addOrderBtn">เพิ่มออเดอร์</span>
-      </button>
-      <section class="summary-card">
-        <div class="sum-top">
-          <div class="sum-block">
-            <div class="sum-label" data-i18n="statReceivedLabel">รับแล้ว</div>
-            <div class="sum-big"><span id="statReceived">0</span> <span class="sum-of" id="statOfTotal">จาก 0</span></div>
-          </div>
-          <div class="sum-lines">
-            <div class="sum-line"><span data-i18n="statDueLabel">ค้างชำระ</span><b id="statRemain">฿0</b></div>
-            <div class="sum-line"><span data-i18n="statTotalLabel">ยอดรวม</span><b id="statSpent">฿0</b></div>
-          </div>
-        </div>
-        <div class="progress-track"><div class="progress-fill" id="statProgressFill" style="width:0%"></div></div>
-        <div class="rail-filter">
-          <div class="filter-head"><span data-i18n="filterByStatus">กรองตามสถานะ</span><button type="button" class="filter-clear" id="btnClearStatus" data-i18n="filterClear" hidden>ล้างตัวกรอง</button></div>
-          <div class="filter-hint" data-i18n="filterHint">แตะที่สถานะเพื่อดูเฉพาะออเดอร์กลุ่มนั้น</div>
-        <button type="button" class="rail-row active" data-status="all"><span class="si sm all"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-list"/></svg></span><span class="rail-name" data-i18n="chipAll">ทั้งหมด</span><span class="count" data-count="all"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="wishlist"><span class="si sm" style="--c:var(--status-wishlist)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-wishlist"/></svg></span><span class="rail-name" data-i18n="statusWishlist">อยากได้</span><span class="count" data-count="wishlist"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="deposit"><span class="si sm" style="--c:var(--status-deposit)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-deposit"/></svg></span><span class="rail-name" data-i18n="statusDeposit">มัดจำแล้ว</span><span class="count" data-count="deposit"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="full"><span class="si sm" style="--c:var(--status-full)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-full"/></svg></span><span class="rail-name" data-i18n="statusFull">จ่ายเต็มแล้ว</span><span class="count" data-count="full"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="shipping"><span class="si sm" style="--c:var(--status-shipping)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-shipping"/></svg></span><span class="rail-name" data-i18n="statusShipping">รอจัดส่ง</span><span class="count" data-count="shipping"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="intransit"><span class="si sm" style="--c:var(--status-intransit)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-intransit"/></svg></span><span class="rail-name" data-i18n="statusInTransit">กำลังจัดส่ง</span><span class="count" data-count="intransit"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="received"><span class="si sm" style="--c:var(--status-received)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-received"/></svg></span><span class="rail-name" data-i18n="statusReceived">ได้รับแล้ว</span><span class="count" data-count="received"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        <button type="button" class="rail-row" data-status="cancelled"><span class="si sm" style="--c:var(--status-cancelled)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-st-cancelled"/></svg></span><span class="rail-name" data-i18n="statusCancelled">ยกเลิก</span><span class="count" data-count="cancelled"></span><svg class="go" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 1l4 4-4 4"/></svg></button>
-        </div>
-      </section>
-    </aside>
+    
   </div>
     </section>
 
@@ -475,6 +452,11 @@
             <input type="number" id="fAcctDue" min="1" max="31" step="1" inputmode="numeric" placeholder="10">
           </div>
         </div>
+      </div>
+      <div class="form-row">
+        <label data-i18n="acctColor">สีของบัญชี</label>
+        <div class="acct-colors" id="acctColors" role="group"></div>
+        <div class="field-hint" data-i18n="acctColorHint">สีนี้ใช้กับชื่อ ยอดเงิน และกราฟสัดส่วนของบัญชีนี้</div>
       </div>
       <div class="form-row">
         <label class="check-line"><input type="checkbox" id="fAcctMain"> <span data-i18n="acctMain">ตั้งเป็นบัญชีหลัก (รายการที่ไม่ได้เลือกบัญชีจะลงบัญชีนี้)</span></label>
@@ -991,30 +973,30 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=20261103f"></script>
-<script src="js/i18n-data.js?v=20261103f"></script>
-<script src="js/state.js?v=20261103f"></script>
-<script src="js/i18n.js?v=20261103f"></script>
-<script src="js/appearance.js?v=20261103f"></script>
-<script src="js/header.js?v=20261103f"></script>
-<script src="js/storage.js?v=20261103f"></script>
-<script src="js/utils.js?v=20261103f"></script>
-<script src="js/images.js?v=20261103f"></script>
-<script src="js/render.js?v=20261103f"></script>
-<script src="js/order-form.js?v=20261103f"></script>
-<script src="js/bulk.js?v=20261103f"></script>
-<script src="js/detail.js?v=20261103f"></script>
-<script src="js/data-io.js?v=20261103f"></script>
-<script src="js/optimize.js?v=20261103f"></script>
-<script src="js/sync.js?v=20261103f"></script>
-<script src="js/router.js?v=20261103f"></script>
-<script src="js/home.js?v=20261103f"></script>
-<script src="js/finance-data.js?v=20261103f"></script>
-<script src="js/finance-sync.js?v=20261103f"></script>
-<script src="js/finance-ui.js?v=20261103f"></script>
-<script src="js/finance-acc.js?v=20261103f"></script>
-<script src="js/planner.js?v=20261103f"></script>
-<script src="js/main.js?v=20261103f"></script>
-<script src="js/pwa.js?v=20261103f"></script>
+<script src="js/config.js?v=20261103j"></script>
+<script src="js/i18n-data.js?v=20261103j"></script>
+<script src="js/state.js?v=20261103j"></script>
+<script src="js/i18n.js?v=20261103j"></script>
+<script src="js/appearance.js?v=20261103j"></script>
+<script src="js/header.js?v=20261103j"></script>
+<script src="js/storage.js?v=20261103j"></script>
+<script src="js/utils.js?v=20261103j"></script>
+<script src="js/images.js?v=20261103j"></script>
+<script src="js/render.js?v=20261103j"></script>
+<script src="js/order-form.js?v=20261103j"></script>
+<script src="js/bulk.js?v=20261103j"></script>
+<script src="js/detail.js?v=20261103j"></script>
+<script src="js/data-io.js?v=20261103j"></script>
+<script src="js/optimize.js?v=20261103j"></script>
+<script src="js/sync.js?v=20261103j"></script>
+<script src="js/router.js?v=20261103j"></script>
+<script src="js/home.js?v=20261103j"></script>
+<script src="js/finance-data.js?v=20261103j"></script>
+<script src="js/finance-sync.js?v=20261103j"></script>
+<script src="js/finance-ui.js?v=20261103j"></script>
+<script src="js/finance-acc.js?v=20261103j"></script>
+<script src="js/planner.js?v=20261103j"></script>
+<script src="js/main.js?v=20261103j"></script>
+<script src="js/pwa.js?v=20261103j"></script>
 </body>
 </html>

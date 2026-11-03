@@ -1,0 +1,4 @@
+Handwriting fonts used on the Home notebook (personal use, files bundled unchanged):
+- iannnnn-DUCK-Bold.ttf  (iannnnn DUCK)  - headings
+- Iannnnn-COW-Bold.ttf   (Iannnnn COW)   - body text and numbers
+Fonts by iannnnn (f0nt.com). Check the licence on the font's download page before sharing this site publicly or commercially.

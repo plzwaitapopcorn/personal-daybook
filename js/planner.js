@@ -284,12 +284,12 @@ function planWeekStripHtml() {
 }
 function planHomeItems() {
   var today = todayStr(), out = [];
-  for (var i = 0; i < 14 && out.length < 9; i++) {
+  for (var i = 0; i < 14 && out.length < 12; i++) {
     var d = pAdd(today, i), x = planDay(d, []);
     x.all.forEach(function (it) { out.push({ date: d, s: null, title: it.e.title, color: it.e.color | 0 }); });
     x.timed.forEach(function (it) { out.push({ date: d, s: it.s, en: it.en, title: it.e.title, color: it.e.color | 0, rep: it.e.repeat }); });
   }
-  return out.slice(0, 9);
+  return out.slice(0, 12);
 }
 (function registerPlannerWidget() {
   var w = { id: "schedule", titleKey: "wSchedule", size: "m", ledger: true, page: "l", more: { page: "schedule" }, render: function (b) {

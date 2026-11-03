@@ -184,6 +184,56 @@ function homeOrdersSummary() {
   return { sum: sum, nDue: due.length, nTransit: transit };
 }
 
+// Desktop: the notebook is a fixed-height spread; whatever does not fit flows onto the next spread (turn the page).
+// Phone: one long page per side, switched with the tabs.
+var homeSpread = 0;
+function homePaged() { return window.matchMedia("(min-width: 900px)").matches; }
+function homeOverflows(host) { return host.scrollHeight > host.clientHeight + 1; }
+
+function homeCardEl(id, pages) {
+  var w = homeWidgetById(id), pg = homePageOf(w), pos = pages[pg].indexOf(id);
+  var card = document.createElement("section");
+  card.className = "hw hw-" + w.size + (w.ledger ? " hw-led" : "");
+  card.setAttribute("data-wid", id);
+  var head = '<h4>' + (w.icon ? svgIcon(w.icon) : "") + "<span>" + escapeHtml(t(w.titleKey)) + "</span>" +
+    (w.more && !homeEdit ? '<a class="hw-more" href="#/' + w.more.page + '"' + (w.more.status !== undefined ? ' data-more="' + w.more.status + '"' : "") + ' title="' + escapeHtml(t("seeAll")) + '" aria-label="' + escapeHtml(t("seeAll")) + '">' + svgIcon("chev-r") + "</a>" : "") + "</h4>";
+  card.innerHTML = head + '<div class="hw-body"></div>';
+  if (homeEdit) {
+    var tools = document.createElement("div");
+    tools.className = "hw-tools";
+    tools.innerHTML =
+      '<button type="button" data-wmove="-1" aria-label="' + escapeHtml(t("homeMoveEarlier")) + '"' + (pos === 0 ? " disabled" : "") + '>&#9664;</button>' +
+      '<button type="button" data-wmove="1" aria-label="' + escapeHtml(t("homeMoveLater")) + '"' + (pos === pages[pg].length - 1 ? " disabled" : "") + '>&#9654;</button>' +
+      '<button type="button" data-whide="1" aria-label="' + escapeHtml(t("homeHide")) + '">&#10005;</button>';
+    card.appendChild(tools);
+  }
+  w.render(card.querySelector(".hw-body"));
+  return card;
+}
+
+// One sheet of the notebook. Page 0 (left) = time, page 1 (right) = things & money; later pages are claimed by whichever group overflows.
+function homePageHtml(idx, paged, ctx) {
+  var left = idx % 2 === 0, first = idx < 2;
+  var h = '<section class="bk-p ' + (left ? "bk-l" : "bk-r") + (first ? "" : " cont") + '" data-idx="' + idx + '"><div class="bk-in"><div class="bk-paper"></div>' + (left ? '<i class="bk-mg"></i><i class="bk-mg b"></i>' : "");
+  if (idx === 0) h += '<div class="bk-top">' + homeDayHeadHtml() + ctx.week + "</div>";
+  if (idx === 1) h += '<div class="bk-rh"><div class="t">' + escapeHtml(t("homeOrdersTitle")) + "<small>" + escapeHtml(t("homeOrdSub", { a: ctx.sum.nTransit, b: ctx.sum.nDue })) + "</small></div>" +
+      (ctx.sum.sum > 0 ? '<div class="bk-stamp">' + escapeHtml(t("homeStampDue")) + "<b>฿" + money(ctx.sum.sum) + "</b></div>" : "") + "</div>";
+  h += '<div class="bk-body"></div><div class="bk-folio">– ' + (idx === 0 ? escapeHtml(t("homeTabSched")) + " · " : idx === 1 ? escapeHtml(t("homeTabOrders")) + " · " : "") + (idx + 1) + " –</div></div>";
+  if (paged) h += left ? '<button type="button" class="bk-curl bk-prev" data-bkgo="-1" aria-label="' + escapeHtml(t("homePrevSpread")) + '" hidden></button>'
+                        : '<button type="button" class="bk-curl bk-next" data-bkgo="1" aria-label="' + escapeHtml(t("homeNextSpread")) + '" hidden></button>';
+  else h += left ? '<button type="button" class="bk-curl" data-bkpg="r" aria-label="' + escapeHtml(t("homeFlipOrders")) + '"></button><span class="bk-flip">' + escapeHtml(t("homeFlipOrders")) + "</span>"
+                 : '<button type="button" class="bk-curl lf" data-bkpg="l" aria-label="' + escapeHtml(t("homeFlipSched")) + '"></button><span class="bk-flip lf">' + escapeHtml(t("homeFlipSched")) + "</span>";
+  return h + "</section>";
+}
+function homeClaim(pg, group) {
+  if (pg.getAttribute("data-grp")) return;
+  pg.setAttribute("data-grp", group); pg.classList.add("grp-" + group);
+  var tab = group === "l" ? '<a class="bk-tab tl" href="#/schedule">' + svgIcon("table") + "<span>" + escapeHtml(t("homeTabSched")) + "</span></a>"
+                          : '<a class="bk-tab tr" href="#/orders">' + svgIcon("bag") + "<span>" + escapeHtml(t("homeTabOrders")) + "</span></a>";
+  pg.insertAdjacentHTML("afterbegin", tab);
+  pg.querySelector(".bk-body").className = "bk-body " + (group === "l" ? "bk-lines g-l" : "bk-rbody g-r");
+}
+
 function renderHome() {
   var grid = document.getElementById("homeGrid");
   if (!grid) return;
@@ -195,53 +245,59 @@ function renderHome() {
   grid.className = "home-grid" + (homeEdit ? " editing" : "");
   var pages = { l: [], r: [] };
   vis.forEach(function (id) { pages[homePageOf(homeWidgetById(id))].push(id); });
-  var sum = homeOrdersSummary();
-  var week = typeof planWeekStripHtml === "function" ? planWeekStripHtml() : "";
+  var paged = homePaged();
+  var ctx = { sum: homeOrdersSummary(), week: typeof planWeekStripHtml === "function" ? planWeekStripHtml() : "" };
+
   grid.innerHTML =
     '<div class="bk-mtabs"><button type="button" class="s' + (homePg === "l" ? " on" : "") + '" data-bkpg="l">' + svgIcon("table") + escapeHtml(t("homeTabSched")) + "</button>" +
       '<button type="button" class="o' + (homePg === "r" ? " on" : "") + '" data-bkpg="r">' + svgIcon("bag") + escapeHtml(t("homeTabOrders")) + "</button></div>" +
-    '<div class="bk" data-pg="' + homePg + '">' +
-    '<section class="bk-p bk-l"><a class="bk-tab" href="#/schedule">' + svgIcon("table") + "<span>" + escapeHtml(t("homeTabSched")) + "</span></a>" +
-      '<div class="bk-in"><div class="bk-paper"></div><i class="bk-mg"></i><i class="bk-mg b"></i>' +
-      '<div class="bk-top">' + homeDayHeadHtml() + week + '</div><div class="bk-lines" id="bkL"></div>' +
-      '<div class="bk-folio">\u2013 ' + escapeHtml(t("homeTabSched")) + ' \u00b7 1 \u2013</div></div>' +
-      '<button type="button" class="bk-curl" data-bkpg="r" aria-label="' + escapeHtml(t("homeFlipOrders")) + '"></button><span class="bk-flip">' + escapeHtml(t("homeFlipOrders")) + "</span></section>" +
-    '<section class="bk-p bk-r"><a class="bk-tab" href="#/orders">' + svgIcon("bag") + "<span>" + escapeHtml(t("homeTabOrders")) + "</span></a>" +
-      '<div class="bk-in"><div class="bk-paper"></div>' +
-      '<div class="bk-rh"><div class="t">' + escapeHtml(t("homeOrdersTitle")) + "<small>" + escapeHtml(t("homeOrdSub", { a: sum.nTransit, b: sum.nDue })) + "</small></div>" +
-      (sum.sum > 0 ? '<div class="bk-stamp">' + escapeHtml(t("homeStampDue")) + "<b>\u0e3f" + money(sum.sum) + "</b></div>" : "") + "</div>" +
-      '<div class="bk-rbody" id="bkR"></div>' +
-      '<div class="bk-folio">\u2013 ' + escapeHtml(t("homeTabOrders")) + ' \u00b7 2 \u2013</div></div>' +
-      '<button type="button" class="bk-curl lf" data-bkpg="l" aria-label="' + escapeHtml(t("homeFlipSched")) + '"></button><span class="bk-flip lf">' + escapeHtml(t("homeFlipSched")) + "</span></section>" +
-    '<i class="bk-gut"></i><i class="bk-st a"></i><i class="bk-st b"></i><div class="bk-rib"><i></i></div></div>';
-  var hostL = document.getElementById("bkL"), hostR = document.getElementById("bkR");
+    '<div class="bk' + (paged ? " paged" : "") + '" data-pg="' + homePg + '"><i class="bk-gut"></i><i class="bk-st a"></i><i class="bk-st b"></i><div class="bk-rib"><i></i></div></div>';
+  var book = grid.querySelector(".bk");
+  var spreads = [], pageEls = [];
+  function spreadAt(k) {
+    while (spreads.length <= k) {
+      var n = spreads.length, sp = document.createElement("div");
+      sp.className = "bk-sp on";   // every spread counts as visible while measuring
+      sp.innerHTML = homePageHtml(2 * n, paged, ctx) + homePageHtml(2 * n + 1, paged, ctx);
+      book.insertBefore(sp, book.querySelector(".bk-gut"));
+      spreads.push(sp); pageEls.push(sp.children[0], sp.children[1]);
+    }
+    return spreads[k];
+  }
+  spreadAt(0); homeClaim(pageEls[0], "l"); homeClaim(pageEls[1], "r");
+  var body = function (idx) { spreadAt(idx >> 1); return pageEls[idx].querySelector(".bk-body"); };
+  var ptr = { l: 0, r: 1 }, nPages = 2;
   var slip = document.createElement("div"); slip.className = "bk-slip";
   slip.innerHTML = '<h5><i></i>' + escapeHtml(t("homeSlipTitle")) + '</h5><div class="bk-sg"></div>';
   var nSlip = 0;
+  vis.forEach(function (id) { var w = homeWidgetById(id); if (homePageOf(w) === "r" && w.size === "s") nSlip++; });
+  // the money slip is tucked into the first right page, so reserve its room before the other cards go in
+  if (nSlip) body(1).appendChild(slip);
+
   vis.forEach(function (id) {
-    var w = homeWidgetById(id), pg = homePageOf(w), pos = pages[pg].indexOf(id);
-    var card = document.createElement("section");
-    card.className = "hw hw-" + w.size + (w.ledger ? " hw-led" : "");
-    card.setAttribute("data-wid", id);
-    var head = '<h4>' + (w.icon ? svgIcon(w.icon) : "") + "<span>" + escapeHtml(t(w.titleKey)) + "</span>" +
-      (w.more && !homeEdit ? '<a class="hw-more" href="#/' + w.more.page + '"' + (w.more.status !== undefined ? ' data-more="' + w.more.status + '"' : "") + ' title="' + escapeHtml(t("seeAll")) + '" aria-label="' + escapeHtml(t("seeAll")) + '">' + svgIcon("chev-r") + "</a>" : "") + "</h4>";
-    card.innerHTML = head + '<div class="hw-body"></div>';
-    if (homeEdit) {
-      var tools = document.createElement("div");
-      tools.className = "hw-tools";
-      tools.innerHTML =
-        '<button type="button" data-wmove="-1" aria-label="' + escapeHtml(t("homeMoveEarlier")) + '"' + (pos === 0 ? " disabled" : "") + '>&#9664;</button>' +
-        '<button type="button" data-wmove="1" aria-label="' + escapeHtml(t("homeMoveLater")) + '"' + (pos === pages[pg].length - 1 ? " disabled" : "") + '>&#9654;</button>' +
-        '<button type="button" data-whide="1" aria-label="' + escapeHtml(t("homeHide")) + '">&#10005;</button>';
-      card.appendChild(tools);
+    var w = homeWidgetById(id), pg = homePageOf(w), card = homeCardEl(id, pages);
+    if (pg === "r" && w.size === "s") { slip.querySelector(".bk-sg").appendChild(card); return; }
+    var place = function (idx) { var hh = body(idx); if (idx === 1 && nSlip) hh.insertBefore(card, slip); else hh.appendChild(card); return hh; };
+    var h = place(ptr[pg]);
+    if (paged && homeOverflows(h) && h.querySelectorAll(":scope > .hw").length > 1) {
+      h.removeChild(card);
+      var idx = nPages++; body(idx); homeClaim(pageEls[idx], pg); ptr[pg] = idx;
+      place(idx);
     }
-    w.render(card.querySelector(".hw-body"));
-    if (pg === "l") hostL.appendChild(card);
-    else if (w.size === "s") { slip.querySelector(".bk-sg").appendChild(card); nSlip++; }
-    else hostR.appendChild(card);
   });
-  if (nSlip) hostR.appendChild(slip);
-  if (!vis.length) hostR.innerHTML = '<div class="hempty wide">' + escapeHtml(t("homeNone")) + "</div>";
+  if (!vis.length) body(1).innerHTML = '<div class="hempty wide">' + escapeHtml(t("homeNone")) + "</div>";
+
+  if (paged) {
+    if (homeSpread > spreads.length - 1) homeSpread = spreads.length - 1;
+    if (homeSpread < 0) homeSpread = 0;
+    spreads.forEach(function (sp, k) {
+      sp.classList.toggle("on", k === homeSpread);
+      var pv = sp.querySelector(".bk-prev"), nx = sp.querySelector(".bk-next");
+      if (pv) pv.hidden = k === 0;
+      if (nx) nx.hidden = k === spreads.length - 1;
+    });
+    book.setAttribute("data-spreads", spreads.length);
+  }
 
   var panel = document.getElementById("homeAddPanel");
   panel.hidden = !homeEdit;
@@ -254,12 +310,33 @@ function renderHome() {
       : '<span class="hempty">' + escapeHtml(t("homeNoHidden")) + "</span>";
   }
 }
+function homeGo(d) {
+  var n = document.querySelectorAll("#homeGrid .bk-sp").length;
+  var k = Math.max(0, Math.min(n - 1, homeSpread + d));
+  if (k === homeSpread) return;
+  homeSpread = k;
+  var sps = document.querySelectorAll("#homeGrid .bk-sp");
+  Array.prototype.forEach.call(sps, function (sp, i) { sp.classList.toggle("on", i === k); });
+}
 
 function initHome() {
   var page = document.getElementById("page-home");
+  document.addEventListener("keydown", function (e) {
+    if (currentPageId !== "home" || e.altKey || e.ctrlKey || e.metaKey) return;
+    var tg = e.target, tag = tg && tg.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (tg && tg.isContentEditable) || document.querySelector(".modal-overlay.open, .overlay.open")) return;
+    if (!homePaged()) return;
+    if (e.key === "ArrowRight") homeGo(1); else if (e.key === "ArrowLeft") homeGo(-1);
+  });
+  var rz = null, lastW = window.innerWidth, lastH = window.innerHeight;
+  window.addEventListener("resize", function () {
+    clearTimeout(rz);
+    rz = setTimeout(function () { if (currentPageId === "home" && (window.innerWidth !== lastW || window.innerHeight !== lastH)) { lastW = window.innerWidth; lastH = window.innerHeight; renderHome(); } }, 180);
+  });
   page.addEventListener("click", function (e) {
     var el;
     if ((el = e.target.closest("[data-bkpg]"))) { homePg = el.getAttribute("data-bkpg"); renderHome(); return; }
+    if ((el = e.target.closest("[data-bkgo]"))) { homeGo(parseInt(el.getAttribute("data-bkgo"), 10)); return; }
     if ((el = e.target.closest("#btnHomeEdit"))) { homeEdit = !homeEdit; renderHome(); return; }
     if ((el = e.target.closest("#btnHomeAdd"))) { runQuickAdd(); return; }
     if ((el = e.target.closest("[data-wmove]"))) { homeMove(el.closest("[data-wid]").getAttribute("data-wid"), parseInt(el.getAttribute("data-wmove"), 10)); return; }

@@ -291,8 +291,71 @@ function planHomeItems() {
   }
   return out.slice(0, 12);
 }
+// ---- Home, desktop: the left page is a weekly spread (Mon-Sun), each day a block of ruled lines ----
+function pIsoWeek(ds) {
+  var d = pDate(ds); d.setHours(12); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  var w1 = new Date(d.getFullYear(), 0, 4); w1.setHours(12);
+  return 1 + Math.round(((d - w1) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7);
+}
+function pWeekItems(ws) {
+  var out = [];
+  for (var i = 0; i < 7; i++) {
+    var d = pAdd(ws, i), x = planDay(d, []), list = [];
+    x.all.forEach(function (it) { list.push({ s: null, title: it.e.title, color: it.e.color | 0 }); });
+    x.timed.forEach(function (it) { list.push({ s: it.s, en: it.en, title: it.e.title, color: it.e.color | 0, rep: it.e.repeat }); });
+    out.push({ date: d, list: list });
+  }
+  return out;
+}
+function planWeekHeadHtml() {
+  var today = todayStr(), ws = pWeekStart(today), we = pAdd(ws, 6), loc = I18N[state.lang].locale;
+  var a = pDate(ws), b = pDate(we), n = pWeekItems(ws).reduce(function (s, x) { return s + x.list.length; }, 0);
+  var range = a.getMonth() === b.getMonth()
+    ? a.getDate() + " \u2013 " + b.toLocaleDateString(loc, { day: "numeric", month: "long" })
+    : a.toLocaleDateString(loc, { day: "numeric", month: "short" }) + " \u2013 " + b.toLocaleDateString(loc, { day: "numeric", month: "short" });
+  return '<div class="wk-head"><div class="wk-no"><small>' + escapeHtml(t("homeWeekNo")) + "</small>" + pIsoWeek(today) + "</div>" +
+    '<div class="wk-ttl">' + escapeHtml(range) + "<small>" + escapeHtml(b.toLocaleDateString(loc, { year: "numeric" }) + " \u00b7 " + t("homeWeekCount", { n: n })) + "</small></div></div>" + homeBtnsHtml();
+}
+function planWkEv(date, it) {
+  var tm = it.s != null ? pHM(it.s) : t("homeAllDay"), sub = it.s != null ? "\u2013 " + pHM(it.en) : "";
+  if (it.rep) sub = (sub ? sub + " \u00b7 " : "") + t("planRep" + ({ daily: 1, weekly: 2, monthly: 3 }[it.rep] || 0));
+  return '<button type="button" class="wk-ev c' + it.color + (it.s == null ? " ad" : "") + '" data-plan-go="' + date + '"><span class="tm">' + escapeHtml(tm) + '</span><span class="tt"><b>' + escapeHtml(it.title) + "</b>" + (sub ? "<em>" + escapeHtml(sub) + "</em>" : "") + "</span></button>";
+}
+function planHomeWeekHtml() {
+  var today = todayStr(), ws = pWeekStart(today), days = pWeekItems(ws), rh = 36;
+  var bkH = Math.max(600, Math.min(980, window.innerHeight - 124)), rows = Math.max(12, Math.floor((bkH - 148 - 40) / rh));
+  // blocks: Mon-Fri each own block, Sat + Sun share one (two columns). Every block is at least 2 lines tall.
+  var need = days.slice(0, 5).map(function (x) { return Math.max(2, x.list.length); });
+  need.push(Math.max(2, days[5].list.length, days[6].list.length));
+  var total = need.reduce(function (s, v) { return s + v; }, 0);
+  while (total > rows) {   // too much for the page: trim the tallest block, the rest shows as "+n"
+    var mi = need.indexOf(Math.max.apply(null, need));
+    if (need[mi] <= 2) break;
+    need[mi]--; total--;
+  }
+  var spare = rows - total, k = 0;   // leftover lines are shared out so the week fills the page
+  while (spare > 0 && k < 60) { var bi = k % 6; if (need[bi] < 4) { need[bi]++; spare--; } k++; }
+  function dayLab(x) {
+    var d = pDate(x.date), tdy = x.date === today, wd = pWeekday(x.date, "long");
+    if (state.lang === "th") wd = wd.replace(/^วัน/, "");
+    return '<button type="button" class="wk-d' + (tdy ? " t" : "") + '" data-plan-go="' + x.date + '"><span>' + escapeHtml(wd) + "</span><b>" + d.getDate() + "</b></button>";
+  }
+  function evs(x, cap) {
+    if (!x.list.length) return '<div class="wk-free">' + escapeHtml(t("homeFree")) + "</div>";
+    var shown = x.list.length > cap ? x.list.slice(0, cap - 1) : x.list, h = shown.map(function (it) { return planWkEv(x.date, it); }).join("");
+    if (shown.length < x.list.length) h += '<button type="button" class="wk-more" data-plan-go="' + x.date + '">' + escapeHtml(t("homeMoreN", { n: x.list.length - shown.length })) + "</button>";
+    return h;
+  }
+  var h = "";
+  for (var i = 0; i < 5; i++) h += '<div class="wk-b' + (days[i].date === today ? " t" : "") + '" style="--n:' + need[i] + '">' + dayLab(days[i]) + '<div class="wk-evs">' + evs(days[i], need[i]) + "</div></div>";
+  h += '<div class="wk-b wk-we' + (days[5].date === today || days[6].date === today ? " t" : "") + '" style="--n:' + need[5] + '">' +
+    '<div class="wk-col' + (days[5].date === today ? " t" : "") + '">' + dayLab(days[5]) + '<div class="wk-evs">' + evs(days[5], need[5]) + "</div></div>" +
+    '<div class="wk-col sun' + (days[6].date === today ? " t" : "") + '">' + dayLab(days[6]) + '<div class="wk-evs">' + evs(days[6], need[5]) + "</div></div></div>";
+  return '<div class="wk">' + h + "</div>";
+}
 (function registerPlannerWidget() {
   var w = { id: "schedule", titleKey: "wSchedule", size: "m", ledger: true, page: "l", more: { page: "schedule" }, render: function (b) {
+    if (typeof homePaged === "function" && homePaged()) { b.innerHTML = planHomeWeekHtml(); return; }
     var list = planHomeItems();
     if (!list.length) { b.innerHTML = '<div class="hempty">' + escapeHtml(t("planHomeEmpty")) + "</div>"; return; }
     var today = todayStr(), tom = pAdd(today, 1), wk = pAdd(today, 6), group = "", h = "";

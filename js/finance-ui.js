@@ -489,7 +489,7 @@ function finMonthRows() { return finRowsOfMonth(monthKeyOf(new Date())); }
   } };
   HOME_WIDGETS.unshift(left); HOME_WIDGETS.unshift(spend);
   var idx = HOME_WIDGETS.findIndex(function (w) { return w.id === "incoming"; });
-  HOME_WIDGETS.splice(idx, 0, cats);
+  HOME_WIDGETS.splice(idx + 1, 0, cats);   // the category pad sits under the incoming board
   var ri = HOME_WIDGETS.findIndex(function (w) { return w.id === "recent-orders"; });
   HOME_WIDGETS.splice(ri, 0, recent);
 })();

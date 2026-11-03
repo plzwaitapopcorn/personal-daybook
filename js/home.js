@@ -6,7 +6,7 @@
 
 var HOME_KEY = "preorderVault_home";
 var homePrefs = { order: [], hidden: [] };
-var HOME_DEFAULT_HIDDEN = ["stat-received", "stat-spent", "fin-acc", "fin-debt"];   // first run only: keeps the top strip to four numbers
+var HOME_DEFAULT_HIDDEN = ["stat-received", "stat-spent", "fin-acc", "fin-debt", "fin-recent"];   // first run only: keeps the top strip to four numbers
 var homeEdit = false;
 
 (function loadHomePrefs() {
@@ -32,10 +32,12 @@ function shortDate(dateStr) {
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString(I18N[state.lang].locale, { day: "numeric", month: "short" });
 }
+// no picture -> a little printed stamp design (colour + doodle picked from the order id so it stays the same)
 function homeThumb(o) {
-  return o.mainImage
-    ? '<img src="' + (o.mainThumb || o.mainImage).replace(/"/g, "&quot;") + '" alt="" loading="lazy">'
-    : placeholderSvg();
+  if (o.mainImage) return '<img src="' + (o.mainThumb || o.mainImage).replace(/"/g, "&quot;") + '" alt="" loading="lazy">';
+  var h = 0, k = String(o.id || o.productName || "");
+  for (var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) % 5;
+  return '<span class="ph v' + h + '"></span>';
 }
 // One line of the "today" page: [date in the margin] [status icon] name + shop ... [stamp] amount
 function homeRow(o, sub, right, label, tag, stamp) {
@@ -54,13 +56,24 @@ function homeDueTxt(o) {
   if (n === 0) return t("homeDueToday");
   return t("homeDueIn", { date: shortDate(o.dueDate), n: n });
 }
+// desktop to-do pad: just the date ("6 พ.ย."), the notebook has no room for the long sentence
+function homeDueShort(o) {
+  if (!o.dueDate) return t("homeNoDue");
+  var n = daysUntil(o.dueDate);
+  return n <= 0 ? homeDueTxt(o) : shortDate(o.dueDate);
+}
 function homeTrackHtml(o) {
+  if (homePaged()) {   // desktop notebook: a capsule bar with four stages
+    var st = { full: 1, shipping: 2, intransit: 3, received: 4 }[o.status] || 1, keys = ["trkOrdered", "trkShipped", "trkArrived", "trkReceived"];
+    return '<span class="cap"><span class="cap-bar"><i style="width:' + (st * 25) + '%"></i><s></s><s></s><s></s></span><span class="cap-lb">' +
+      keys.map(function (k, i) { return '<em class="' + (st > i ? "on" : "") + (st === i + 1 ? " cur" : "") + '">' + escapeHtml(t(k)) + "</em>"; }).join("") + "</span></span>";
+  }
   var step = { full: 1, shipping: 2, intransit: 3 }[o.status] || 1, h = "";
   for (var i = 1; i <= 3; i++) h += (i > 1 ? '<s class="' + (step >= i ? "on" : "") + '"></s>' : "") + '<i class="' + (step >= i ? "on" : "") + '"></i>';
   return '<span class="trk">' + h + "<em>" + escapeHtml(statusLabel(o.status)) + "</em></span>";
 }
 function homeTicketHtml(o, sub, right, track) {
-  return '<div class="tw"><i class="clip"></i><button type="button" class="ti" data-open="' + o.id + '"><span class="th">' + homeThumb(o) + "</span>" +
+  return '<div class="tw"><i class="clip"></i><button type="button" class="ti" data-open="' + o.id + '"><span class="thw"><span class="th">' + homeThumb(o) + "</span></span>" +
     '<span class="tx"><b>' + nameHtml(o) + "</b><small>" + sub + "</small>" + (track || "") + "</span>" + (right || "") + "</button></div>";
 }
 // ---- widgets ----
@@ -102,7 +115,7 @@ var HOME_WIDGETS = [
       b.innerHTML = list.slice(0, 4).map(function (o) {
         var sub = escapeHtml(o.shopName || t("noShop")) + (Number(o.depositPaid) ? " \u00b7 " + escapeHtml(t("depositPaidShort", { n: money(o.depositPaid) })) : "");
         var late = o.dueDate && o.dueDate <= todayStr();
-        return homeTicketHtml(o, sub, '<span class="pr"><span class="dn">\u0e3f' + money(remainingOf(o)) + "</span><small" + (late ? ' class="late"' : "") + ">" + escapeHtml(homeDueTxt(o)) + "</small></span>");
+        return homeTicketHtml(o, sub, '<span class="pr"><span class="dn">\u0e3f' + money(remainingOf(o)) + "</span><small" + (late ? ' class="late"' : "") + ">" + escapeHtml(homePaged() ? homeDueShort(o) : homeDueTxt(o)) + "</small></span>");
       }).join("");
     } },
   { id: "incoming", titleKey: "wIncoming", size: "m", ledger: true, more: { page: "orders", status: "all" }, render: function (b) {
@@ -168,14 +181,16 @@ function homeShow(id) {
 }
 function homeEditOff() { if (homeEdit) { homeEdit = false; if (currentPageId === "home") renderHome(); } }
 
+function homeBtnsHtml() {
+  return '<div class="bk-btns"><button type="button" class="icon-toggle' + (homeEdit ? " is-active" : "") + '" id="btnHomeEdit" title="' + escapeHtml(t(homeEdit ? "homeEditDone" : "homeEdit")) + '" aria-label="' + escapeHtml(t(homeEdit ? "homeEditDone" : "homeEdit")) + '">' +
+      svgIcon(homeEdit ? "check" : "edit") + "</button>" +
+    '<button type="button" class="home-add" id="btnHomeAdd" title="' + escapeHtml(t("quickAddTitle")) + '" aria-label="' + escapeHtml(t("quickAddTitle")) + '">' + svgIcon("plus") + "</button></div>";
+}
 function homeDayHeadHtml() {
   var d = new Date(), loc = I18N[state.lang].locale;
   var eb = '<span class="dnum">' + d.getDate() + '</span><span class="dtxt"><b>' + escapeHtml(d.toLocaleDateString(loc, { weekday: "long" })) + "</b>" +
     escapeHtml(d.toLocaleDateString(loc, { month: "long", year: "numeric" })) + "</span>";
-  var act = '<button type="button" class="icon-toggle' + (homeEdit ? " is-active" : "") + '" id="btnHomeEdit" title="' + escapeHtml(t(homeEdit ? "homeEditDone" : "homeEdit")) + '" aria-label="' + escapeHtml(t(homeEdit ? "homeEditDone" : "homeEdit")) + '">' +
-      svgIcon(homeEdit ? "check" : "edit") + "</button>" +
-    '<button type="button" class="home-add" id="btnHomeAdd" title="' + escapeHtml(t("quickAddTitle")) + '" aria-label="' + escapeHtml(t("quickAddTitle")) + '">' + svgIcon("plus") + "</button>";
-  return '<div class="bk-day">' + eb + '</div><div class="bk-btns">' + act + "</div>";
+  return '<div class="bk-day">' + eb + "</div>" + homeBtnsHtml();
 }
 function homeOrdersSummary() {
   var due = activeOrders().filter(function (o) { return remainingOf(o) > 0; });
@@ -215,7 +230,7 @@ function homeCardEl(id, pages) {
 function homePageHtml(idx, paged, ctx) {
   var left = idx % 2 === 0, first = idx < 2;
   var h = '<section class="bk-p ' + (left ? "bk-l" : "bk-r") + (first ? "" : " cont") + '" data-idx="' + idx + '"><div class="bk-in"><div class="bk-paper"></div>' + (left ? '<i class="bk-mg"></i><i class="bk-mg b"></i>' : "");
-  if (idx === 0) h += '<div class="bk-top">' + homeDayHeadHtml() + ctx.week + "</div>";
+  if (idx === 0) h += '<div class="bk-top">' + (paged && typeof planWeekHeadHtml === "function" ? planWeekHeadHtml() : homeDayHeadHtml() + ctx.week) + "</div>";
   if (idx === 1) h += '<div class="bk-rh"><div class="t">' + escapeHtml(t("homeOrdersTitle")) + "<small>" + escapeHtml(t("homeOrdSub", { a: ctx.sum.nTransit, b: ctx.sum.nDue })) + "</small></div>" +
       (ctx.sum.sum > 0 ? '<div class="bk-stamp">' + escapeHtml(t("homeStampDue")) + "<b>฿" + money(ctx.sum.sum) + "</b></div>" : "") + "</div>";
   h += '<div class="bk-body"></div><div class="bk-folio">– ' + (idx === 0 ? escapeHtml(t("homeTabSched")) + " · " : idx === 1 ? escapeHtml(t("homeTabOrders")) + " · " : "") + (idx + 1) + " –</div></div>";
@@ -271,13 +286,13 @@ function renderHome() {
   slip.innerHTML = '<h5><i></i>' + escapeHtml(t("homeSlipTitle")) + '</h5><div class="bk-sg"></div>';
   var nSlip = 0;
   vis.forEach(function (id) { var w = homeWidgetById(id); if (homePageOf(w) === "r" && w.size === "s") nSlip++; });
-  // the money slip is tucked into the first right page, so reserve its room before the other cards go in
+  // the memo pad (money summary) is the first thing on the first right page
   if (nSlip) body(1).appendChild(slip);
 
   vis.forEach(function (id) {
     var w = homeWidgetById(id), pg = homePageOf(w), card = homeCardEl(id, pages);
     if (pg === "r" && w.size === "s") { slip.querySelector(".bk-sg").appendChild(card); return; }
-    var place = function (idx) { var hh = body(idx); if (idx === 1 && nSlip) hh.insertBefore(card, slip); else hh.appendChild(card); return hh; };
+    var place = function (idx) { var hh = body(idx); hh.appendChild(card); return hh; };
     var h = place(ptr[pg]);
     if (paged && homeOverflows(h) && h.querySelectorAll(":scope > .hw").length > 1) {
       h.removeChild(card);
@@ -285,6 +300,7 @@ function renderHome() {
       place(idx);
     }
   });
+  if (nSlip && !paged) body(1).appendChild(slip);   // phone: the money slip stays tucked at the end of the page
   if (!vis.length) body(1).innerHTML = '<div class="hempty wide">' + escapeHtml(t("homeNone")) + "</div>";
 
   if (paged) {
@@ -319,8 +335,20 @@ function homeGo(d) {
   Array.prototype.forEach.call(sps, function (sp, i) { sp.classList.toggle("on", i === k); });
 }
 
+// The desk behind the notebook on a wide screen is a green cutting mat: grid lines come from CSS, the ruler numbers are drawn here.
+function homeBuildMat() {
+  var m = document.getElementById("deskMat");
+  if (!m) { m = document.createElement("div"); m.id = "deskMat"; m.className = "desk-mat"; m.setAttribute("aria-hidden", "true"); document.body.insertBefore(m, document.body.firstChild); }
+  var U = 38, GL = 46, GT = 34, vw = window.innerWidth, vh = window.innerHeight;
+  var nx = Math.max(4, Math.floor((vw - GL - 34) / U)), ny = Math.max(4, Math.floor((vh - GT - 24) / U)), h = '<i class="mg" style="width:' + nx * U + "px;height:" + ny * U + 'px"></i>', i;
+  for (i = 0; i <= nx; i++) h += '<i class="nx" style="left:' + (GL + i * U) + "px;top:" + (GT + ny * U + 7) + 'px">' + i + "</i>";
+  for (i = 0; i <= ny; i++) h += '<i class="ny" style="top:' + (GT + i * U) + "px;left:" + (GL - 30) + 'px">' + i + "</i>";
+  m.innerHTML = h;
+}
 function initHome() {
   var page = document.getElementById("page-home");
+  homeBuildMat();
+  window.addEventListener("resize", function () { clearTimeout(homeBuildMat.t); homeBuildMat.t = setTimeout(homeBuildMat, 200); });
   document.addEventListener("keydown", function (e) {
     if (currentPageId !== "home" || e.altKey || e.ctrlKey || e.metaKey) return;
     var tg = e.target, tag = tg && tg.tagName;

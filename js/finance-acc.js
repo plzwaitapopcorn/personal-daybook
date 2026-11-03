@@ -5,7 +5,7 @@
 
 var accDraft = { id: null, type: "bank" };
 var accView = { sel: "" };
-var recDraft = { id: null, type: "expense" };
+var recDraft = { id: null, type: "expense", cat: "" };
 var recView = { year: new Date().getFullYear(), month: monthKeyOf(new Date()), mode: "grid" };
 
 var ACCT_ICON = { bank: "bank", card: "card", cash: "cash" };
@@ -347,7 +347,7 @@ function recGridHtml() {
       return '<td class="' + (k === nowKey ? "cur" : "") + (r.type === "income" && st === "due" ? " inc-cell" : "") + '">' + c + "</td>";
     }).join("");
     var note = r.count > 0 ? ' <small>' + escapeHtml(t("recInst", { n: r.count })) + "</small>" : "";
-    return '<tr class="rg-row' + (r.invest ? " inv" : "") + '" data-recedit="' + r.id + '" tabindex="0"><td class="rg-item">' + (r.invest ? svgIcon("chart") : "") + escapeHtml(r.name) + note + "</td>" + cells + '<td class="rg-y">' + recMoney(sum) + "</td></tr>";
+    return '<tr class="rg-row' + (r.invest ? " inv" : "") + (r.cat ? " has-cat" : "") + '" ' + recCatStyle(r) + ' data-recedit="' + r.id + '" tabindex="0"><td class="rg-item">' + (r.invest ? svgIcon("chart") : "") + escapeHtml(r.name) + note + "</td>" + cells + '<td class="rg-y">' + recMoney(sum) + "</td></tr>";
   }
   var inc = recs.filter(function (r) { return r.type === "income"; });
   var exp = recs.filter(function (r) { return r.type !== "income" && !r.invest; });
@@ -371,7 +371,9 @@ function recMonthHtml() {
   function item(r) {
     var d = monthIndex(key) - monthIndex(r.start), idx = Math.floor(d / (r.every || 1)) + 1;
     var sub = r.count > 0 ? t("recInst", { n: r.count }) + " · " + idx + "/" + r.count : (r.every > 1 ? t("recEvery" + r.every) : "");
-    return '<button type="button" class="frow rec-item' + (r.invest ? " inv" : "") + '" data-recedit="' + r.id + '"><span class="frow-dot" style="background:' + (r.type === "income" ? "var(--ok-ink)" : r.invest ? "#d9b53a" : "var(--text-faint)") + '"></span>' +
+    if (r.cat && finCatById(r.cat)) sub = (sub ? sub + " · " : "") + finCatName(finCatById(r.cat));
+    var rc = r.cat ? finCatById(r.cat) : null;
+    return '<button type="button" class="frow rec-item' + (r.invest ? " inv" : "") + (rc ? " has-cat" : "") + '" ' + recCatStyle(r) + ' data-recedit="' + r.id + '"><span class="frow-dot" style="background:' + (rc ? finCatColor(rc) : r.type === "income" ? "var(--ok-ink)" : r.invest ? "#d9b53a" : "var(--text-faint)") + '"></span>' +
       '<span class="frow-main"><span class="frow-t">' + escapeHtml(r.name) + "</span>" + (sub ? '<span class="frow-s">' + escapeHtml(sub) + "</span>" : "") + "</span>" +
       '<span class="frow-r' + (r.type === "income" ? " inc" : "") + '">' + (r.type === "income" ? "+" : "−") + yen(recAmountIn(r, key)) + "</span></button>";
   }
@@ -403,6 +405,18 @@ function renderFinRec() {
 }
 function yearLabel(y) { return state.lang === "th" ? y + 543 : y; }
 
+// the row's text takes its category colour (CSS softens it so every colour stays readable)
+function recCatStyle(r) {
+  var c = r.cat ? finCatById(r.cat) : null;
+  return c ? 'style="--rc:' + finCatColor(c) + '"' : "";
+}
+function renderRecCats() {
+  var cats = finCats(recDraft.type === "income" ? "income" : "expense");
+  if (!cats.some(function (c) { return c.id === recDraft.cat; })) recDraft.cat = "";
+  el("recCatChips").innerHTML = cats.map(function (c) {
+    return '<button type="button" class="cat-chip' + (c.id === recDraft.cat ? " on" : "") + '" data-recpick="' + c.id + '"><i style="background:' + finCatColor(c) + '"></i>' + escapeHtml(finCatName(c)) + "</button>";
+  }).join("");
+}
 // ---- recurring modal ----
 function setRecType(type) {
   recDraft.type = type;
@@ -411,10 +425,12 @@ function setRecType(type) {
     b.classList.toggle("on", on); b.setAttribute("aria-pressed", on ? "true" : "false");
   });
   el("recInvestRow").hidden = type === "income";
+  renderRecCats();
 }
 function openRecModal(id, type) {
   var r = id ? finRecs().filter(function (x) { return x.id === id; })[0] : null;
   recDraft.id = r ? r.id : null;
+  recDraft.cat = r && r.cat ? r.cat : "";
   el("recModalTitle").textContent = t(r ? "recEdit" : "recNew");
   el("fRecName").value = r ? r.name : "";
   el("fRecAmount").value = r ? r.amount : "";
@@ -436,7 +452,7 @@ function submitRec(e) {
   var start = el("fRecStart").value || monthKeyOf(new Date());
   var rec = { id: recDraft.id || uid(), kind: "rec", type: recDraft.type, name: name, amount: amount,
     every: parseInt(el("fRecEvery").value, 10) || 1, start: start, count: Math.max(0, parseInt(el("fRecCount").value, 10) || 0),
-    invest: recDraft.type !== "income" && el("fRecInvest").checked };
+    invest: recDraft.type !== "income" && el("fRecInvest").checked, cat: recDraft.cat || "" };
   var i = fin.items.findIndex(function (x) { return x.id === rec.id; });
   if (i >= 0) { rec.sort = fin.items[i].sort || 0; fin.items[i] = rec; }
   else { rec.sort = finRecs().reduce(function (m, x) { return Math.max(m, x.sort || 0); }, 0) + 1; fin.items.push(rec); }
@@ -542,6 +558,12 @@ function initFinAcc() {
   el("recModalOverlay").addEventListener("click", function (e) { if (e.target === this) closeRecModal(); });
   el("recForm").addEventListener("submit", submitRec);
   el("btnRecDelete").addEventListener("click", deleteRec);
+  el("recCatChips").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-recpick]"); if (!b) return;
+    var id = b.getAttribute("data-recpick");
+    recDraft.cat = recDraft.cat === id ? "" : id;        // tap again to clear
+    renderRecCats();
+  });
   el("recTypeSeg").addEventListener("click", function (e) { var b = e.target.closest("[data-rectype]"); if (b) setRecType(b.getAttribute("data-rectype")); });
   // keyboard: Enter / Space on a card or a grid row
   ["finAccBody", "finRecBody", "finDebtBody"].forEach(function (id) {

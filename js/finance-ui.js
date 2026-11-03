@@ -459,6 +459,7 @@ function finRenderPage(page) {
 }
 function finRenderAll() {
   if (FIN_PAGES.indexOf(currentPageId) !== -1) finRenderPage(currentPageId);
+  if (currentPageId === "schedule" && typeof renderPlanner === "function") renderPlanner();
   if (typeof renderHome === "function" && currentPageId === "home") renderHome();
   if (typeof renderNav === "function") renderNav();
 }
@@ -501,6 +502,7 @@ function initFinance() {
     { id: "transfer", icon: "swap", labelKey: "finAddTransfer", hidden: function () { return finAccts().length < 2; }, run: function () { openTxModal(null, "transfer"); } }
   );
   if (typeof initFinAcc === "function") initFinAcc();
+  if (typeof initPlanner === "function") initPlanner();
   // modals
   el("closeTxModal").addEventListener("click", closeTxModal);
   el("cancelTxForm").addEventListener("click", closeTxModal);

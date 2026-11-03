@@ -14,8 +14,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="css/app.css?v=20261101e">
-<link rel="stylesheet" href="css/theme-b.css?v=20261101e">
+<link rel="stylesheet" href="css/app.css?v=20261103a">
+<link rel="stylesheet" href="css/theme-b.css?v=20261103a">
 </head>
 <body>
 
@@ -54,6 +54,8 @@
  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2l3 3-3 3M3 11V9a4 4 0 0 1 4-4h13M7 22l-3-3 3-3M21 13v2a4 4 0 0 1-4 4H4"/></symbol>
  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M18 14.5c1.7.8 3 2.7 3 5.5"/></symbol>
+ <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 4v16M15 4v16"/></symbol>
+ <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="4" y="8" width="16" height="11" rx="2.5"/><circle cx="16" cy="13.5" r="1.1"/></symbol>
 </defs></svg>
 
@@ -226,6 +228,10 @@
     <section class="page" id="page-fin-debt" data-page="fin-debt" hidden>
       <div class="page-title pg-head"><h2 data-i18n="navFinDebt">ค้างจ่าย</h2><div class="pg-tools" id="finDebtTools"></div></div>
       <div id="finDebtBody"></div>
+    </section>
+    <section class="page" id="page-schedule" data-page="schedule" hidden>
+      <div class="page-title pg-head"><h2 data-i18n="navSchedule">ตาราง</h2><div class="pg-tools" id="planTools"></div></div>
+      <div id="planBody"></div>
     </section>
     <section class="page" id="page-settings" data-page="settings" hidden>
       <div class="page-title"><h2 data-i18n="navSettings">ตั้งค่า</h2></div>
@@ -521,6 +527,10 @@
           <input type="number" id="fRecCount" min="0" step="1" inputmode="numeric" data-i18n-placeholder="recCountPh" placeholder="เว้นว่างถ้าไม่มีวันจบ">
         </div>
       </div>
+      <div class="form-row">
+        <label data-i18n="finCategory">หมวด</label>
+        <div class="cat-chips" id="recCatChips"></div>
+      </div>
       <div class="form-row" id="recInvestRow">
         <label class="check-line"><input type="checkbox" id="fRecInvest"> <span data-i18n="recInvest">เป็นเงินลงทุน / เงินออม (แสดงเป็นแถวเน้นสี)</span></label>
       </div>
@@ -611,6 +621,65 @@
         <span></span>
         <div class="footer-right">
           <button type="button" class="btn-secondary" id="cancelDebtPay" data-i18n="cancelBtn">ยกเลิก</button>
+          <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Schedule: appointment -->
+<div class="modal-overlay" id="evtModalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="evtModalTitle">นัดหมาย</h2>
+      <button class="icon-btn" id="closeEvtModal" type="button" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <form id="evtForm">
+      <div class="form-row">
+        <label data-i18n="planTitle">เรื่อง</label>
+        <input type="text" id="fEvtTitle" required data-i18n-placeholder="planTitlePh" placeholder="เช่น ประชุมทีม">
+      </div>
+      <div class="form-row-2">
+        <div class="form-row">
+          <label data-i18n="finDate">วันที่</label>
+          <input type="date" id="fEvtDate" required>
+        </div>
+        <div class="form-row">
+          <label data-i18n="planRepeat">ซ้ำ</label>
+          <select id="fEvtRepeat">
+            <option value="" data-i18n="planRep0">ไม่ซ้ำ</option>
+            <option value="daily" data-i18n="planRep1">ทุกวัน</option>
+            <option value="weekly" data-i18n="planRep2">ทุกสัปดาห์</option>
+            <option value="monthly" data-i18n="planRep3">ทุกเดือน</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="check-line"><input type="checkbox" id="fEvtAllDay"> <span data-i18n="planAllDay">ทั้งวัน</span></label>
+      </div>
+      <div class="form-row-2" id="evtTimes">
+        <div class="form-row">
+          <label data-i18n="planStart">เริ่ม</label>
+          <input type="time" id="fEvtStart">
+        </div>
+        <div class="form-row">
+          <label data-i18n="planEnd">สิ้นสุด</label>
+          <input type="time" id="fEvtEnd">
+        </div>
+      </div>
+      <div class="form-row">
+        <label data-i18n="planColor">สี</label>
+        <div class="ev-colors" id="evtColors"></div>
+      </div>
+      <div class="form-row">
+        <label data-i18n="planNote">โน้ต (ไม่บังคับ)</label>
+        <input type="text" id="fEvtNote">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-danger-text" id="btnEvtDelete" data-i18n="planDelete" style="display:none;">ลบนัดหมายนี้</button>
+        <div class="footer-right">
+          <button type="button" class="btn-secondary" id="cancelEvtForm" data-i18n="cancelBtn">ยกเลิก</button>
           <button type="submit" class="btn-primary" style="margin-left:0;" data-i18n="saveBtn">บันทึก</button>
         </div>
       </div>
@@ -916,29 +985,30 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=20261101e"></script>
-<script src="js/i18n-data.js?v=20261101e"></script>
-<script src="js/state.js?v=20261101e"></script>
-<script src="js/i18n.js?v=20261101e"></script>
-<script src="js/appearance.js?v=20261101e"></script>
-<script src="js/header.js?v=20261101e"></script>
-<script src="js/storage.js?v=20261101e"></script>
-<script src="js/utils.js?v=20261101e"></script>
-<script src="js/images.js?v=20261101e"></script>
-<script src="js/render.js?v=20261101e"></script>
-<script src="js/order-form.js?v=20261101e"></script>
-<script src="js/bulk.js?v=20261101e"></script>
-<script src="js/detail.js?v=20261101e"></script>
-<script src="js/data-io.js?v=20261101e"></script>
-<script src="js/optimize.js?v=20261101e"></script>
-<script src="js/sync.js?v=20261101e"></script>
-<script src="js/router.js?v=20261101e"></script>
-<script src="js/home.js?v=20261101e"></script>
-<script src="js/finance-data.js?v=20261101e"></script>
-<script src="js/finance-sync.js?v=20261101e"></script>
-<script src="js/finance-ui.js?v=20261101e"></script>
-<script src="js/finance-acc.js?v=20261101e"></script>
-<script src="js/main.js?v=20261101e"></script>
-<script src="js/pwa.js?v=20261101e"></script>
+<script src="js/config.js?v=20261103a"></script>
+<script src="js/i18n-data.js?v=20261103a"></script>
+<script src="js/state.js?v=20261103a"></script>
+<script src="js/i18n.js?v=20261103a"></script>
+<script src="js/appearance.js?v=20261103a"></script>
+<script src="js/header.js?v=20261103a"></script>
+<script src="js/storage.js?v=20261103a"></script>
+<script src="js/utils.js?v=20261103a"></script>
+<script src="js/images.js?v=20261103a"></script>
+<script src="js/render.js?v=20261103a"></script>
+<script src="js/order-form.js?v=20261103a"></script>
+<script src="js/bulk.js?v=20261103a"></script>
+<script src="js/detail.js?v=20261103a"></script>
+<script src="js/data-io.js?v=20261103a"></script>
+<script src="js/optimize.js?v=20261103a"></script>
+<script src="js/sync.js?v=20261103a"></script>
+<script src="js/router.js?v=20261103a"></script>
+<script src="js/home.js?v=20261103a"></script>
+<script src="js/finance-data.js?v=20261103a"></script>
+<script src="js/finance-sync.js?v=20261103a"></script>
+<script src="js/finance-ui.js?v=20261103a"></script>
+<script src="js/finance-acc.js?v=20261103a"></script>
+<script src="js/planner.js?v=20261103a"></script>
+<script src="js/main.js?v=20261103a"></script>
+<script src="js/pwa.js?v=20261103a"></script>
 </body>
 </html>

@@ -53,7 +53,7 @@ function finInitMaps() {
 function readFinLS() {
   try { var a = JSON.parse(localStorage.getItem(FIN_LS_KEY) || "[]"); return Array.isArray(a) ? a : []; } catch (e) { return []; }
 }
-function finValid(x) { return x && typeof x.id === "string" && (x.kind === "tx" || x.kind === "cat" || x.kind === "acct" || x.kind === "rec" || x.kind === "inst" || x.kind === "debt"); }
+function finValid(x) { return x && typeof x.id === "string" && (x.kind === "tx" || x.kind === "cat" || x.kind === "acct" || x.kind === "rec" || x.kind === "inst" || x.kind === "debt" || x.kind === "evt"); }
 
 function finSeedDefaults() {
   var seeded = false;

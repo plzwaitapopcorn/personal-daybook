@@ -12,6 +12,7 @@ var NAV_ITEMS = [
   { page: "fin-rec",      icon: "repeat", labelKey: "navFinRec",      group: "navGroupFinance", parent: "fin" },
   { page: "fin-debt",     icon: "users",  labelKey: "navFinDebt",     group: "navGroupFinance", parent: "fin" },
   { page: "fin-cats",     icon: "tag",    labelKey: "navFinCats",     group: "navGroupFinance", parent: "fin" },
+  { page: "schedule",     icon: "table",  labelKey: "navSchedule",    tabKey: "navSchedule",  group: "navGroupSchedule" },
   { page: "orders",       icon: "bag",    labelKey: "navOrders",      tabKey: "navOrdersTab", group: "navGroupOrders", tileKey: "navGroupOrders",
     count: function () { return state.orders.length; },
     tileSub: function () { return t("tileOrdersSub", { n: state.orders.length }); } }
@@ -22,7 +23,7 @@ var QUICK_ADDS = [
   { id: "order", icon: "bag", labelKey: "addOrderBtn", run: function () { openOrderModal(); } }
 ];
 
-var PAGE_IDS = ["home", "fin", "fin-acc", "fin-rec", "fin-debt", "fin-cats", "orders", "settings"];
+var PAGE_IDS = ["home", "fin", "fin-acc", "fin-rec", "fin-debt", "fin-cats", "schedule", "orders", "settings"];
 var PAGE_ALIAS = { "fin-overview": "fin", "fin-list": "fin" };   // old bookmarks / links
 var currentPageId = "";
 var lastSubPage = {};     // area page -> sub-page last opened (so its tab returns there)
@@ -59,6 +60,7 @@ function showPage(page) {
   }
   if (page === "home" && typeof renderHome === "function") renderHome();
   if ((page === "fin" || page === "fin-acc" || page === "fin-rec" || page === "fin-debt" || page === "fin-cats") && typeof finRenderPage === "function") finRenderPage(page);
+  if (page === "schedule" && typeof renderPlanner === "function") renderPlanner();
   if (page === "orders" && typeof renderAll === "function" && state.loaded) renderGrid();
 }
 
